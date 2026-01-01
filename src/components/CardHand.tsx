@@ -7,6 +7,9 @@ interface CardHandProps {
   cards: CardType[];
   isFlipped?: boolean;
   onCardClick?: (card: CardType, index: number) => void;
+  validCards?: CardType[];
+  selectedCard?: CardType | null;
+  confirmingCard?: CardType | null;
   className?: string;
 }
 
@@ -14,6 +17,9 @@ export function CardHand({
   cards,
   isFlipped = false,
   onCardClick,
+  validCards,
+  selectedCard,
+  confirmingCard,
   className,
 }: CardHandProps) {
   if (cards.length === 0) {
@@ -51,13 +57,23 @@ export function CardHand({
         // Vertical offset: cards at edges are slightly lower (arc effect)
         const yOffset = Math.abs(offsetFromCenter) * 4;
 
+        const isValid = validCards
+          ? validCards.some((c) => c.suit === card.suit && c.rank === card.rank)
+          : true;
+        const canClick = onCardClick && isValid && !isFlipped;
+
         return (
           <motion.div
             key={`${card.suit}-${card.rank}-${index}`}
             className={cn(
               "absolute transition-all duration-100 ease-out",
-              onCardClick &&
-                "hover:scale-110 hover:-translate-y-8 hover:z-[100]"
+              canClick &&
+                !(
+                  selectedCard?.suit === card.suit &&
+                  selectedCard?.rank === card.rank
+                ) &&
+                "hover:scale-110 hover:-translate-y-8 hover:z-[100] cursor-pointer",
+              !isValid && onCardClick && "opacity-50 cursor-not-allowed"
             )}
             style={{
               left: `calc(50% + ${xOffset}px)`,
@@ -83,13 +99,55 @@ export function CardHand({
               delay: index * 0.03,
             }}
           >
-            <Card
-              suit={card.suit}
-              rank={card.rank}
-              isFlipped={isFlipped}
-              onClick={onCardClick ? () => onCardClick(card, index) : undefined}
-              className="shadow-xl"
-            />
+            <motion.div
+              animate={
+                confirmingCard?.suit === card.suit &&
+                confirmingCard?.rank === card.rank
+                  ? {
+                      scale: [1.1, 1.3],
+                      rotate: [0, 180],
+                    }
+                  : selectedCard?.suit === card.suit &&
+                    selectedCard?.rank === card.rank
+                  ? {
+                      scale: 1.1,
+                      y: -16,
+                    }
+                  : {}
+              }
+              transition={{
+                duration:
+                  confirmingCard?.suit === card.suit &&
+                  confirmingCard?.rank === card.rank
+                    ? 0.4
+                    : 0.2,
+                ease: "easeInOut",
+              }}
+              style={{
+                zIndex:
+                  selectedCard?.suit === card.suit &&
+                  selectedCard?.rank === card.rank
+                    ? 200
+                    : confirmingCard?.suit === card.suit &&
+                      confirmingCard?.rank === card.rank
+                    ? 300
+                    : index,
+              }}
+            >
+              <Card
+                suit={card.suit}
+                rank={card.rank}
+                isFlipped={isFlipped}
+                isSelected={
+                  selectedCard?.suit === card.suit &&
+                  selectedCard?.rank === card.rank
+                }
+                onClick={
+                  canClick ? () => onCardClick?.(card, index) : undefined
+                }
+                className="shadow-xl"
+              />
+            </motion.div>
           </motion.div>
         );
       })}

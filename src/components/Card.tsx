@@ -5,6 +5,7 @@ interface CardProps {
   suit: CardSuit;
   rank: CardRank;
   isFlipped?: boolean;
+  isSelected?: boolean;
   className?: string;
   onClick?: () => void;
 }
@@ -38,7 +39,7 @@ function rankToString(rank: CardRank): string {
   }
 }
 
-export function Card({ suit, rank, isFlipped = false, className, onClick }: CardProps) {
+export function Card({ suit, rank, isFlipped = false, isSelected = false, className, onClick }: CardProps) {
   const rankStr = rankToString(rank);
   const suitSymbol = SUIT_SYMBOLS[suit];
   const suitColor = SUIT_COLORS[suit];
@@ -49,7 +50,9 @@ export function Card({ suit, rank, isFlipped = false, className, onClick }: Card
         "relative bg-white rounded-xl shadow-lg select-none",
         "flex flex-col items-center justify-center",
         "w-24 h-36 md:w-28 md:h-40",
+        "transition-all duration-200",
         onClick && "cursor-pointer",
+        isSelected && "ring-4 ring-yellow-400 ring-offset-2 ring-offset-poker-green scale-110 -translate-y-4 z-[200] shadow-2xl animate-pulse",
         className
       )}
       onClick={onClick}

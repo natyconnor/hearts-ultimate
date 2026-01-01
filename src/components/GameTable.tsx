@@ -1,13 +1,19 @@
 import { motion } from "framer-motion";
 import { CardHand } from "./CardHand";
 import { Card } from "./Card";
-import type { Card as CardType, Player } from "../types/game";
+import type { Card as CardType, Player, GameState } from "../types/game";
 import { cn } from "../lib/utils";
+import { getValidCards, isFirstTrick } from "../game/rules";
 
 interface GameTableProps {
   players: Player[];
   currentPlayerId: string | null;
   currentTrick: Array<{ playerId: string; card: CardType }>;
+  gameState: GameState | null;
+  selectedCard?: CardType | null;
+  confirmingCard?: CardType | null;
+  showCompletedTrick?: boolean;
+  cardHandRef?: React.RefObject<HTMLDivElement | null>;
   onCardClick?: (card: CardType, index: number) => void;
   className?: string;
 }
@@ -16,6 +22,11 @@ export function GameTable({
   players,
   currentPlayerId,
   currentTrick,
+  gameState,
+  selectedCard,
+  confirmingCard,
+  showCompletedTrick,
+  cardHandRef,
   onCardClick,
   className,
 }: GameTableProps) {
@@ -26,6 +37,57 @@ export function GameTable({
 
   // Get current player's index
   const currentPlayerIndex = players.findIndex((p) => p.id === currentPlayerId);
+
+  // Get valid cards for current player
+  const currentPlayer =
+    currentPlayerIndex >= 0 ? players[currentPlayerIndex] : null;
+  const validCards =
+    gameState &&
+    currentPlayer &&
+    currentPlayerIndex === gameState.currentPlayerIndex
+      ? getValidCards(
+          currentPlayer.hand,
+          gameState.currentTrick,
+          gameState.heartsBroken,
+          isFirstTrick(gameState)
+        )
+      : [];
+
+  // Get card position in the trick circle based on which player played it
+  // Clockwise order: 0=bottom, 1=left, 2=top, 3=right
+  const getCardPositionForPlayer = (playerIndex: number) => {
+    // Position cards in a circle based on player position
+    // Clockwise: 0=bottom (6 o'clock), 1=left (9 o'clock), 2=top (12 o'clock), 3=right (3 o'clock)
+    const radius = 80;
+    const positions = {
+      0: { x: 0, y: radius }, // Bottom player's card at bottom of circle
+      1: { x: -radius, y: 0 }, // Left player's card at left of circle (clockwise from bottom)
+      2: { x: 0, y: -radius }, // Top player's card at top of circle
+      3: { x: radius, y: 0 }, // Right player's card at right of circle
+    };
+    return positions[playerIndex as keyof typeof positions] || { x: 0, y: 0 };
+  };
+
+  // Get starting position for animation (from player's position)
+  const getPlayerStartPosition = (playerIndex: number) => {
+    const positions = {
+      0: { x: 0, y: 250 }, // Bottom - card flies from below
+      1: { x: -250, y: 0 }, // Left - card flies from left (clockwise from bottom)
+      2: { x: 0, y: -250 }, // Top - card flies from above
+      3: { x: 250, y: 0 }, // Right - card flies from right
+    };
+    return positions[playerIndex as keyof typeof positions] || { x: 0, y: 0 };
+  };
+
+  // Determine which trick to display (current or last completed)
+  const displayTrick =
+    showCompletedTrick && gameState?.lastCompletedTrick
+      ? gameState.lastCompletedTrick
+      : currentTrick;
+  const isShowingCompletedTrick =
+    showCompletedTrick &&
+    gameState?.lastCompletedTrick &&
+    currentTrick.length === 0;
 
   return (
     <div
@@ -51,25 +113,90 @@ export function GameTable({
 
           {/* Center area for current trick */}
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-            <div className="flex gap-3 items-center justify-center min-w-[200px] min-h-[120px]">
-              {currentTrick.length === 0 ? (
+            <div className="flex flex-col gap-2 items-center justify-center min-w-[280px] min-h-[200px]">
+              {displayTrick.length === 0 ? (
                 <div className="text-white/20 text-sm font-medium">
                   Current Trick
                 </div>
               ) : (
-                currentTrick.map((trickCard, index) => (
-                  <motion.div
-                    key={`trick-${trickCard.playerId}-${index}`}
-                    initial={{ scale: 0, rotate: -180, y: 50 }}
-                    animate={{ scale: 1, rotate: 0, y: 0 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                  >
-                    <Card
-                      suit={trickCard.card.suit}
-                      rank={trickCard.card.rank}
-                    />
-                  </motion.div>
-                ))
+                <div className="flex flex-col items-center">
+                  {/* Winner announcement - positioned above cards */}
+                  {isShowingCompletedTrick &&
+                    gameState?.lastTrickWinnerIndex !== undefined && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="bg-green-500/90 text-white text-sm font-bold px-4 py-1.5 rounded-full shadow-lg mb-3 z-20"
+                      >
+                        🏆 {players[gameState.lastTrickWinnerIndex]?.name} wins!
+                      </motion.div>
+                    )}
+                  <div className="relative w-[220px] h-[200px]">
+                    {displayTrick.map((trickCard) => {
+                      const trickPlayerIndex = players.findIndex(
+                        (p) => p.id === trickCard.playerId
+                      );
+
+                      // Check if this card is the winning card
+                      const isWinning =
+                        isShowingCompletedTrick &&
+                        gameState?.lastTrickWinnerIndex === trickPlayerIndex;
+
+                      // Position card based on which player played it
+                      const cardPos =
+                        getCardPositionForPlayer(trickPlayerIndex);
+                      const startPos = getPlayerStartPosition(trickPlayerIndex);
+
+                      return (
+                        <motion.div
+                          key={`trick-${trickCard.playerId}-${trickCard.card.suit}-${trickCard.card.rank}`}
+                          className={cn(
+                            "absolute left-1/2 top-1/2",
+                            isWinning && "ring-4 ring-green-400 rounded-xl z-50"
+                          )}
+                          style={{
+                            marginLeft: -48, // Half of card width
+                            marginTop: -72, // Half of card height
+                          }}
+                          initial={{
+                            x: startPos.x,
+                            y: startPos.y,
+                            scale: 0.5,
+                            opacity: 0,
+                            rotate: -90,
+                          }}
+                          animate={
+                            isWinning
+                              ? {
+                                  x: cardPos.x,
+                                  y: cardPos.y,
+                                  scale: 1.15,
+                                  opacity: 1,
+                                  rotate: 0,
+                                }
+                              : {
+                                  x: cardPos.x,
+                                  y: cardPos.y,
+                                  scale: 1,
+                                  opacity: 1,
+                                  rotate: 0,
+                                }
+                          }
+                          transition={{
+                            type: "spring",
+                            stiffness: 200,
+                            damping: 25,
+                          }}
+                        >
+                          <Card
+                            suit={trickCard.card.suit}
+                            rank={trickCard.card.rank}
+                          />
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -79,19 +206,46 @@ export function GameTable({
           {/* Bottom Player (Current User) - Full fanned hand */}
           <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 pb-2 md:pb-4">
             {getPlayerAtPosition(0) && (
-              <div className="flex flex-col items-center">
+              <div className="flex flex-col items-center" ref={cardHandRef}>
                 <CardHand
                   cards={getPlayerAtPosition(0)?.hand || []}
                   isFlipped={currentPlayerIndex !== 0}
                   onCardClick={
                     currentPlayerIndex === 0 ? onCardClick : undefined
                   }
+                  validCards={
+                    currentPlayerIndex === 0 &&
+                    gameState?.currentPlayerIndex === 0
+                      ? validCards
+                      : undefined
+                  }
+                  selectedCard={selectedCard}
+                  confirmingCard={confirmingCard}
                 />
-                <div className="text-white font-semibold text-sm md:text-lg mt-1 md:mt-2 bg-black/30 px-3 md:px-4 py-1 rounded-full">
+                <div
+                  className={cn(
+                    "text-white font-semibold text-sm md:text-lg mt-1 md:mt-2 px-3 md:px-4 py-1 rounded-full transition-all",
+                    gameState?.currentPlayerIndex === 0
+                      ? "bg-yellow-500/80 shadow-[0_0_12px_rgba(234,179,8,0.6)]"
+                      : gameState?.trickLeaderIndex === 0
+                      ? "bg-emerald-500/80 shadow-[0_0_12px_rgba(16,185,129,0.6)]"
+                      : "bg-black/30"
+                  )}
+                >
                   {getPlayerAtPosition(0)?.name}
                   {getPlayerAtPosition(0)?.isAI && " (AI)"}
                   {currentPlayerIndex === 0 && " (You)"}
+                  {gameState?.currentPlayerIndex === 0 && " - Your Turn"}
+                  {gameState?.trickLeaderIndex === 0 &&
+                    gameState?.currentPlayerIndex !== 0 &&
+                    " 👑"}
                 </div>
+                {gameState && (
+                  <div className="text-white/80 text-xs mt-1">
+                    Score: {gameState.scores[0]} | Round:{" "}
+                    {gameState.roundScores[0]}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -100,10 +254,29 @@ export function GameTable({
           <div className="absolute top-2 md:top-4 left-1/2 transform -translate-x-1/2">
             {getPlayerAtPosition(2) && (
               <div className="flex flex-col items-center gap-1 md:gap-2">
-                <div className="text-white font-semibold text-xs md:text-sm bg-black/30 px-2 md:px-3 py-0.5 md:py-1 rounded-full">
+                <div
+                  className={cn(
+                    "text-white font-semibold text-xs md:text-sm px-2 md:px-3 py-0.5 md:py-1 rounded-full transition-all",
+                    gameState?.currentPlayerIndex === 2
+                      ? "bg-yellow-500/80 shadow-[0_0_12px_rgba(234,179,8,0.6)]"
+                      : gameState?.trickLeaderIndex === 2
+                      ? "bg-emerald-500/80 shadow-[0_0_12px_rgba(16,185,129,0.6)]"
+                      : "bg-black/30"
+                  )}
+                >
                   {getPlayerAtPosition(2)?.name}
                   {getPlayerAtPosition(2)?.isAI && " (AI)"}
+                  {gameState?.currentPlayerIndex === 2 && " - Turn"}
+                  {gameState?.trickLeaderIndex === 2 &&
+                    gameState?.currentPlayerIndex !== 2 &&
+                    " 👑"}
                 </div>
+                {gameState && (
+                  <div className="text-white/70 text-xs mt-0.5">
+                    Score: {gameState.scores[2]} | Round:{" "}
+                    {gameState.roundScores[2]}
+                  </div>
+                )}
                 <div className="flex -space-x-8 md:-space-x-12">
                   {getPlayerAtPosition(2)
                     ?.hand.slice(0, 5)
@@ -134,16 +307,35 @@ export function GameTable({
             )}
           </div>
 
-          {/* Left Player - Vertical stacked cards */}
+          {/* Left Player (Player 1 - clockwise from bottom) - Vertical stacked cards */}
           <div className="absolute left-2 md:left-4 top-1/2 transform -translate-y-1/2">
-            {getPlayerAtPosition(3) && (
+            {getPlayerAtPosition(1) && (
               <div className="flex flex-col items-center gap-1 md:gap-2">
-                <div className="text-white font-semibold text-xs md:text-sm bg-black/30 px-2 md:px-3 py-0.5 md:py-1 rounded-full whitespace-nowrap">
-                  {getPlayerAtPosition(3)?.name}
-                  {getPlayerAtPosition(3)?.isAI && " (AI)"}
+                <div
+                  className={cn(
+                    "text-white font-semibold text-xs md:text-sm px-2 md:px-3 py-0.5 md:py-1 rounded-full whitespace-nowrap transition-all",
+                    gameState?.currentPlayerIndex === 1
+                      ? "bg-yellow-500/80 shadow-[0_0_12px_rgba(234,179,8,0.6)]"
+                      : gameState?.trickLeaderIndex === 1
+                      ? "bg-emerald-500/80 shadow-[0_0_12px_rgba(16,185,129,0.6)]"
+                      : "bg-black/30"
+                  )}
+                >
+                  {getPlayerAtPosition(1)?.name}
+                  {getPlayerAtPosition(1)?.isAI && " (AI)"}
+                  {gameState?.currentPlayerIndex === 1 && " - Turn"}
+                  {gameState?.trickLeaderIndex === 1 &&
+                    gameState?.currentPlayerIndex !== 1 &&
+                    " 👑"}
                 </div>
+                {gameState && (
+                  <div className="text-white/70 text-xs mt-0.5">
+                    Score: {gameState.scores[1]} | Round:{" "}
+                    {gameState.roundScores[1]}
+                  </div>
+                )}
                 <div className="flex flex-col -space-y-10 md:-space-y-14">
-                  {getPlayerAtPosition(3)
+                  {getPlayerAtPosition(1)
                     ?.hand.slice(0, 4)
                     .map((card, idx) => (
                       <motion.div
@@ -162,26 +354,45 @@ export function GameTable({
                       </motion.div>
                     ))}
                 </div>
-                {getPlayerAtPosition(3) &&
-                  getPlayerAtPosition(3)!.hand.length > 0 && (
+                {getPlayerAtPosition(1) &&
+                  getPlayerAtPosition(1)!.hand.length > 0 && (
                     <div className="text-white/70 text-xs mt-1 md:mt-2">
-                      {getPlayerAtPosition(3)!.hand.length} cards
+                      {getPlayerAtPosition(1)!.hand.length} cards
                     </div>
                   )}
               </div>
             )}
           </div>
 
-          {/* Right Player - Vertical stacked cards */}
+          {/* Right Player (Player 3 - clockwise continues) - Vertical stacked cards */}
           <div className="absolute right-2 md:right-4 top-1/2 transform -translate-y-1/2">
-            {getPlayerAtPosition(1) && (
+            {getPlayerAtPosition(3) && (
               <div className="flex flex-col items-center gap-1 md:gap-2">
-                <div className="text-white font-semibold text-xs md:text-sm bg-black/30 px-2 md:px-3 py-0.5 md:py-1 rounded-full whitespace-nowrap">
-                  {getPlayerAtPosition(1)?.name}
-                  {getPlayerAtPosition(1)?.isAI && " (AI)"}
+                <div
+                  className={cn(
+                    "text-white font-semibold text-xs md:text-sm px-2 md:px-3 py-0.5 md:py-1 rounded-full whitespace-nowrap transition-all",
+                    gameState?.currentPlayerIndex === 3
+                      ? "bg-yellow-500/80 shadow-[0_0_12px_rgba(234,179,8,0.6)]"
+                      : gameState?.trickLeaderIndex === 3
+                      ? "bg-emerald-500/80 shadow-[0_0_12px_rgba(16,185,129,0.6)]"
+                      : "bg-black/30"
+                  )}
+                >
+                  {getPlayerAtPosition(3)?.name}
+                  {getPlayerAtPosition(3)?.isAI && " (AI)"}
+                  {gameState?.currentPlayerIndex === 3 && " - Turn"}
+                  {gameState?.trickLeaderIndex === 3 &&
+                    gameState?.currentPlayerIndex !== 3 &&
+                    " 👑"}
                 </div>
+                {gameState && (
+                  <div className="text-white/70 text-xs mt-0.5">
+                    Score: {gameState.scores[3]} | Round:{" "}
+                    {gameState.roundScores[3]}
+                  </div>
+                )}
                 <div className="flex flex-col -space-y-10 md:-space-y-14">
-                  {getPlayerAtPosition(1)
+                  {getPlayerAtPosition(3)
                     ?.hand.slice(0, 4)
                     .map((card, idx) => (
                       <motion.div
@@ -200,10 +411,10 @@ export function GameTable({
                       </motion.div>
                     ))}
                 </div>
-                {getPlayerAtPosition(1) &&
-                  getPlayerAtPosition(1)!.hand.length > 0 && (
+                {getPlayerAtPosition(3) &&
+                  getPlayerAtPosition(3)!.hand.length > 0 && (
                     <div className="text-white/70 text-xs mt-1 md:mt-2">
-                      {getPlayerAtPosition(1)!.hand.length} cards
+                      {getPlayerAtPosition(3)!.hand.length} cards
                     </div>
                   )}
               </div>

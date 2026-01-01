@@ -82,7 +82,10 @@ export const useGameStore = create<GameStore>((set) => ({
             players: updatedPlayers,
             hands: [],
             currentTrick: [],
+            lastCompletedTrick: undefined,
+            lastTrickWinnerIndex: undefined,
             scores: [0, 0, 0, 0],
+            roundScores: [0, 0, 0, 0],
             heartsBroken: false,
           };
       return {

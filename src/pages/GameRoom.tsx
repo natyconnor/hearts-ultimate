@@ -1,6 +1,7 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { motion } from "framer-motion";
 import {
   getRoomBySlug,
   updateRoomGameState,
@@ -14,7 +15,9 @@ import { usePageUnloadWarning } from "../hooks/usePageUnloadWarning";
 import { useGameStore } from "../store/gameStore";
 import { STORAGE_KEYS } from "../lib/constants";
 import { createAIPlayersToFillSlots } from "../lib/aiPlayers";
+import { chooseAICard } from "../lib/aiDecision";
 import { createAndDeal } from "../game/deck";
+import { initializeRound } from "../game/gameLogic";
 import { GameTable } from "../components/GameTable";
 import type { GameState, Player, Card as CardType } from "../types/game";
 
@@ -33,6 +36,10 @@ export function GameRoom() {
   const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(() =>
     localStorage.getItem(STORAGE_KEYS.PLAYER_ID)
   );
+  const [selectedCard, setSelectedCard] = useState<CardType | null>(null);
+  const [confirmingCard, setConfirmingCard] = useState<CardType | null>(null);
+  const [showCompletedTrick, setShowCompletedTrick] = useState(false);
+  const cardHandRef = useRef<HTMLDivElement>(null);
 
   const { isConnected, error: realtimeError } = useGameRealtime(slug ?? null);
 
@@ -184,11 +191,15 @@ export function GameRoom() {
         })
       );
 
-      const updatedGameState: GameState = {
+      let updatedGameState: GameState = {
         ...currentGameState,
         players: playersWithHands,
         hands: hands,
+        roundScores: [0, 0, 0, 0],
       };
+
+      // Initialize round (set first player who has 2 of clubs)
+      updatedGameState = initializeRound(updatedGameState);
 
       // Update game state with dealt cards, then update status
       await updateRoomGameState(slug, updatedGameState);
@@ -289,9 +300,147 @@ export function GameRoom() {
     players.length === 4 && roomStatus === "waiting" && isPlayerInRoom;
   const canLeave = isPlayerInRoom && roomStatus === "waiting";
 
-  const handleCardClick = (card: CardType, index: number) => {
-    // TODO: Implement card playing logic
-    console.log("Card clicked:", card, index);
+  const playCardMutation = useMutation({
+    mutationFn: async ({
+      card,
+      playerId,
+    }: {
+      card: CardType;
+      playerId?: string;
+    }) => {
+      if (!slug || !room) throw new Error("Not in room");
+      const currentGameState = gameState ?? room.gameState;
+      const roomStatus = currentRoom.status ?? room.status;
+
+      if (roomStatus !== "playing") {
+        throw new Error("Game is not in progress");
+      }
+
+      // Use provided playerId (for AI) or currentPlayerId (for human)
+      const targetPlayerId = playerId ?? currentPlayerId;
+      if (!targetPlayerId) {
+        throw new Error("No player ID provided");
+      }
+
+      const { playCard } = await import("../game/gameLogic");
+      const result = playCard(currentGameState, targetPlayerId, card);
+
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      // Check if game should end (someone has 100+ points)
+      const gameOver = result.gameState.scores.some((score) => score >= 100);
+      if (gameOver) {
+        await updateRoomStatus(slug, "finished");
+      }
+
+      await updateRoomGameState(slug, result.gameState);
+
+      return result.gameState;
+    },
+    onSuccess: (updatedGameState) => {
+      // Check if trick just completed (we have a lastCompletedTrick but empty currentTrick)
+      if (
+        updatedGameState.lastCompletedTrick &&
+        updatedGameState.lastCompletedTrick.length === 4 &&
+        updatedGameState.currentTrick.length === 0
+      ) {
+        // Show the completed trick with winner highlight
+        setShowCompletedTrick(true);
+        setTimeout(() => setShowCompletedTrick(false), 2000);
+      }
+
+      updateGameState(updatedGameState);
+      queryClient.invalidateQueries({ queryKey: ["room", slug] });
+      setSelectedCard(null); // Clear selection after successful play
+    },
+  });
+
+  // Auto-play for AI players
+  useEffect(() => {
+    if (roomStatus !== "playing") return;
+    if (!currentGameState) return;
+    if (playCardMutation.isPending) return; // Don't trigger if already playing
+
+    const currentPlayerIndex = currentGameState.currentPlayerIndex;
+    if (currentPlayerIndex === undefined) return;
+
+    const currentPlayer = currentGameState.players[currentPlayerIndex];
+    if (!currentPlayer || !currentPlayer.isAI) return;
+
+    // Small delay for realism (AI "thinking")
+    const timeoutId = setTimeout(() => {
+      const chosenCard = chooseAICard(currentGameState, currentPlayerIndex);
+      if (chosenCard) {
+        playCardMutation.mutate({
+          card: chosenCard,
+          playerId: currentPlayer.id,
+        });
+      }
+    }, 800); // 800ms delay for AI "thinking"
+
+    return () => clearTimeout(timeoutId);
+  }, [
+    currentGameState?.currentPlayerIndex,
+    currentGameState?.currentTrick.length,
+    roomStatus,
+    playCardMutation.isPending,
+    playCardMutation,
+    currentGameState,
+  ]);
+
+  // Handle click-away to deselect card
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        cardHandRef.current &&
+        !cardHandRef.current.contains(event.target as Node)
+      ) {
+        setSelectedCard(null);
+      }
+    };
+
+    if (selectedCard) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+      };
+    }
+  }, [selectedCard]);
+
+  const handleCardClick = (card: CardType) => {
+    if (!currentPlayerId) return;
+
+    const currentGameState = gameState ?? room?.gameState;
+    if (!currentGameState) return;
+
+    const playerIndex = currentGameState.players.findIndex(
+      (p) => p.id === currentPlayerId
+    );
+
+    // Check if it's the player's turn
+    if (currentGameState.currentPlayerIndex !== playerIndex) {
+      return;
+    }
+
+    // If card is already selected, confirm play with animation
+    if (
+      selectedCard &&
+      selectedCard.suit === card.suit &&
+      selectedCard.rank === card.rank
+    ) {
+      setConfirmingCard(card);
+      // Small delay for animation, then play
+      setTimeout(() => {
+        playCardMutation.mutate({ card });
+        setConfirmingCard(null);
+      }, 300);
+      return;
+    }
+
+    // Otherwise, select the card
+    setSelectedCard(card);
   };
 
   if (isLoading) {
@@ -364,10 +513,35 @@ export function GameRoom() {
 
         {/* Game Table - Takes remaining space */}
         <div className="flex-1 min-h-0 relative">
+          {playCardMutation.isError && playCardMutation.error && (
+            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50">
+              <div className="bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg">
+                {playCardMutation.error instanceof Error
+                  ? playCardMutation.error.message
+                  : "Failed to play card"}
+              </div>
+            </div>
+          )}
+          {selectedCard && (
+            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50">
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-yellow-500 text-black px-4 py-2 rounded-lg shadow-lg font-semibold text-sm"
+              >
+                Card selected - Click again to confirm play
+              </motion.div>
+            </div>
+          )}
           <GameTable
             players={players}
             currentPlayerId={currentPlayerId}
             currentTrick={currentGameState?.currentTrick || []}
+            gameState={currentGameState}
+            selectedCard={selectedCard}
+            confirmingCard={confirmingCard}
+            showCompletedTrick={showCompletedTrick}
+            cardHandRef={cardHandRef}
             onCardClick={handleCardClick}
           />
         </div>

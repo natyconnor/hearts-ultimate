@@ -20,10 +20,14 @@ export interface GameState {
   players: Player[];
   hands: Card[][]; // Array of hands, one per player (indexed by player index)
   currentTrick: Array<{ playerId: string; card: Card }>;
-  scores: number[];
+  lastCompletedTrick?: Array<{ playerId: string; card: Card }>; // The last completed trick (for animation)
+  lastTrickWinnerIndex?: number; // The player index who won the last trick
+  scores: number[]; // Cumulative game scores
+  roundScores: number[]; // Scores for current round
   heartsBroken: boolean;
   currentPlayerIndex?: number;
   dealerIndex?: number;
+  trickLeaderIndex?: number; // Index of player who led the current trick
 }
 
 export interface GameRoom {
