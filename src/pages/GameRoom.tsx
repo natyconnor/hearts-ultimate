@@ -15,8 +15,8 @@ import { useGameStore } from "../store/gameStore";
 import { STORAGE_KEYS } from "../lib/constants";
 import { createAIPlayersToFillSlots } from "../lib/aiPlayers";
 import { createAndDeal } from "../game/deck";
-import { formatHandGrouped } from "../game/cardDisplay";
-import type { GameState, Player } from "../types/game";
+import { GameTable } from "../components/GameTable";
+import type { GameState, Player, Card as CardType } from "../types/game";
 
 export function GameRoom() {
   const { slug } = useParams<{ slug: string }>();
@@ -289,156 +289,214 @@ export function GameRoom() {
     players.length === 4 && roomStatus === "waiting" && isPlayerInRoom;
   const canLeave = isPlayerInRoom && roomStatus === "waiting";
 
+  const handleCardClick = (card: CardType, index: number) => {
+    // TODO: Implement card playing logic
+    console.log("Card clicked:", card, index);
+  };
+
   if (isLoading) {
-    return <div>Loading room...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-xl">Loading room...</div>
+      </div>
+    );
   }
 
   if (error || !room) {
-    return <div>Error: {error ? String(error) : "Room not found"}</div>;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-xl text-red-600">
+          Error: {error ? String(error) : "Room not found"}
+        </div>
+      </div>
+    );
   }
 
-  return (
-    <div>
-      <h1>Game Room: {slug}</h1>
-      <p>Status: {roomStatus}</p>
-      <p>Realtime: {isConnected ? "Connected" : "Disconnected"}</p>
-      {realtimeError && (
-        <p style={{ color: "red" }}>Realtime Error: {realtimeError}</p>
-      )}
-
-      <h2>Players ({players.length}/4)</h2>
-      <div>
-        {[0, 1, 2, 3].map((index) => {
-          const player = players[index];
-          const isCurrentPlayer = player?.id === currentPlayerId;
-          const hasCards = player && player.hand.length > 0;
-          const showCards = roomStatus === "playing" && hasCards;
-
-          return (
-            <div
-              key={index}
-              style={{
-                padding: "0.5rem",
-                border: "1px solid #ccc",
-                margin: "0.5rem 0",
-                backgroundColor: isCurrentPlayer ? "#e3f2fd" : "transparent",
-              }}
-            >
-              {player ? (
-                <>
-                  <div>
-                    <strong>{player.name}</strong> {player.isAI && "(AI)"}
-                    {isCurrentPlayer && " (You)"}
-                    {hasCards && (
-                      <span style={{ marginLeft: "0.5rem", color: "#666" }}>
-                        ({player.hand.length} cards)
-                      </span>
-                    )}
-                  </div>
-                  {showCards && (
-                    <div
-                      style={{
-                        marginTop: "0.5rem",
-                        padding: "0.5rem",
-                        backgroundColor: isCurrentPlayer
-                          ? "#fff"
-                          : "rgba(0, 0, 0, 0.05)",
-                        borderRadius: "4px",
-                        fontFamily: "monospace",
-                        fontSize: "0.9rem",
-                      }}
-                    >
-                      {isCurrentPlayer ? (
-                        <div>
-                          <strong>Your hand:</strong>
-                          <div style={{ marginTop: "0.25rem" }}>
-                            {formatHandGrouped(player.hand)}
-                          </div>
-                        </div>
-                      ) : (
-                        <div style={{ color: "#999" }}>
-                          Hand hidden ({player.hand.length} cards)
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <em>Empty</em>
-              )}
+  // Show game table when playing
+  if (roomStatus === "playing") {
+    return (
+      <div className="relative w-full h-screen overflow-hidden">
+        {/* Header overlay */}
+        <div className="absolute top-4 left-4 right-4 z-50 flex items-center justify-between bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-4">
+          <div>
+            <h1 className="text-2xl font-bold text-poker-green">
+              Room: {slug}
+            </h1>
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <div
+                className={`w-2 h-2 rounded-full ${
+                  isConnected ? "bg-green-500" : "bg-red-500"
+                }`}
+              />
+              {isConnected ? "Connected" : "Disconnected"}
             </div>
-          );
-        })}
+          </div>
+          {canLeave && (
+            <button
+              onClick={handleLeave}
+              disabled={leaveRoomMutation.isPending}
+              className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50"
+            >
+              {leaveRoomMutation.isPending ? "Leaving..." : "Leave Game"}
+            </button>
+          )}
+        </div>
+
+        <GameTable
+          players={players}
+          currentPlayerId={currentPlayerId}
+          currentTrick={currentGameState?.currentTrick || []}
+          onCardClick={handleCardClick}
+        />
       </div>
+    );
+  }
 
-      {canJoin && (
-        <button onClick={handleJoin} disabled={joinRoomMutation.isPending}>
-          {joinRoomMutation.isPending ? "Joining..." : "Join as Player"}
-        </button>
-      )}
+  // Lobby view when waiting
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-poker-green via-green-800 to-poker-green flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-2xl w-full">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-3xl font-bold text-poker-green">Game Room</h1>
+          <div className="flex items-center gap-2">
+            <div
+              className={`w-2 h-2 rounded-full ${
+                isConnected ? "bg-green-500" : "bg-red-500"
+              }`}
+            />
+            <span className="text-sm text-gray-600">
+              {isConnected ? "Connected" : "Disconnected"}
+            </span>
+          </div>
+        </div>
 
-      {canAddAI && (
-        <button
-          onClick={handleAddAIPlayers}
-          disabled={addAIPlayersMutation.isPending}
-          style={{ marginLeft: canJoin ? "1rem" : "0" }}
-        >
-          {addAIPlayersMutation.isPending
-            ? "Adding AI..."
-            : `Add AI Player${4 - players.length > 1 ? "s" : ""}`}
-        </button>
-      )}
+        <div className="mb-6">
+          <div className="text-sm text-gray-500 mb-2">Room Code</div>
+          <div className="text-2xl font-mono font-bold text-poker-green bg-gray-100 p-3 rounded-lg">
+            {slug}
+          </div>
+        </div>
 
-      {canStart && (
-        <button
-          onClick={handleStartGame}
-          disabled={startGameMutation.isPending}
-        >
-          {startGameMutation.isPending ? "Starting..." : "Start Game"}
-        </button>
-      )}
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold mb-4">
+            Players ({players.length}/4)
+          </h2>
+          <div className="grid grid-cols-2 gap-4">
+            {[0, 1, 2, 3].map((index) => {
+              const player = players[index];
+              const isCurrentPlayer = player?.id === currentPlayerId;
+              return (
+                <div
+                  key={index}
+                  className={`p-4 rounded-lg border-2 ${
+                    isCurrentPlayer
+                      ? "border-poker-green bg-green-50"
+                      : player
+                      ? "border-gray-200 bg-gray-50"
+                      : "border-dashed border-gray-300 bg-gray-100"
+                  }`}
+                >
+                  {player ? (
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-semibold">
+                          {player.name}
+                          {player.isAI && (
+                            <span className="ml-2 text-xs text-gray-500">
+                              (AI)
+                            </span>
+                          )}
+                        </div>
+                        {isCurrentPlayer && (
+                          <div className="text-sm text-poker-green font-medium">
+                            You
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-gray-400 italic">Empty Slot</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
 
-      {canLeave && (
-        <button
-          onClick={handleLeave}
-          disabled={leaveRoomMutation.isPending}
-          style={{ marginLeft: "1rem" }}
-        >
-          {leaveRoomMutation.isPending ? "Leaving..." : "Leave Room"}
-        </button>
-      )}
+        <div className="flex flex-wrap gap-3">
+          {canJoin && (
+            <button
+              onClick={handleJoin}
+              disabled={joinRoomMutation.isPending}
+              className="px-6 py-3 bg-poker-green text-white rounded-lg hover:bg-green-800 disabled:opacity-50 font-semibold"
+            >
+              {joinRoomMutation.isPending ? "Joining..." : "Join as Player"}
+            </button>
+          )}
 
-      {joinRoomMutation.isError && (
-        <p style={{ color: "red" }}>
-          {joinRoomMutation.error instanceof Error
-            ? joinRoomMutation.error.message
-            : "Failed to join"}
-        </p>
-      )}
+          {canAddAI && (
+            <button
+              onClick={handleAddAIPlayers}
+              disabled={addAIPlayersMutation.isPending}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-semibold"
+            >
+              {addAIPlayersMutation.isPending
+                ? "Adding AI..."
+                : `Add AI Player${4 - players.length > 1 ? "s" : ""}`}
+            </button>
+          )}
 
-      {addAIPlayersMutation.isError && (
-        <p style={{ color: "red" }}>
-          {addAIPlayersMutation.error instanceof Error
-            ? addAIPlayersMutation.error.message
-            : "Failed to add AI players"}
-        </p>
-      )}
+          {canStart && (
+            <button
+              onClick={handleStartGame}
+              disabled={startGameMutation.isPending}
+              className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-semibold"
+            >
+              {startGameMutation.isPending ? "Starting..." : "Start Game"}
+            </button>
+          )}
 
-      {startGameMutation.isError && (
-        <p style={{ color: "red" }}>
-          {startGameMutation.error instanceof Error
-            ? startGameMutation.error.message
-            : "Failed to start game"}
-        </p>
-      )}
+          {canLeave && (
+            <button
+              onClick={handleLeave}
+              disabled={leaveRoomMutation.isPending}
+              className="px-6 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 font-semibold"
+            >
+              {leaveRoomMutation.isPending ? "Leaving..." : "Leave Room"}
+            </button>
+          )}
+        </div>
 
-      {leaveRoomMutation.isError && (
-        <p style={{ color: "red" }}>
-          {leaveRoomMutation.error instanceof Error
-            ? leaveRoomMutation.error.message
-            : "Failed to leave room"}
-        </p>
-      )}
+        {joinRoomMutation.isError && joinRoomMutation.error && (
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
+            {joinRoomMutation.error instanceof Error
+              ? joinRoomMutation.error.message
+              : "Failed to join"}
+          </div>
+        )}
+
+        {addAIPlayersMutation.isError && addAIPlayersMutation.error && (
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
+            {addAIPlayersMutation.error instanceof Error
+              ? addAIPlayersMutation.error.message
+              : "Failed to add AI players"}
+          </div>
+        )}
+
+        {startGameMutation.isError && startGameMutation.error && (
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
+            {startGameMutation.error instanceof Error
+              ? startGameMutation.error.message
+              : "Failed to start game"}
+          </div>
+        )}
+
+        {realtimeError && (
+          <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-700">
+            Realtime Error: {realtimeError}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
