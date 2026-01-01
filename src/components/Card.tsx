@@ -1,5 +1,4 @@
-import { motion } from "framer-motion";
-import type { Card as CardType, CardSuit, CardRank } from "../types/game";
+import type { CardSuit, CardRank } from "../types/game";
 import { cn } from "../lib/utils";
 
 interface CardProps {
@@ -45,22 +44,23 @@ export function Card({ suit, rank, isFlipped = false, className, onClick }: Card
   const suitColor = SUIT_COLORS[suit];
 
   return (
-    <motion.div
+    <div
       className={cn(
-        "relative w-20 h-28 bg-white rounded-2xl shadow-lg cursor-pointer select-none",
+        "relative bg-white rounded-xl shadow-lg select-none",
         "flex flex-col items-center justify-center",
-        onClick && "hover:shadow-xl",
+        "w-24 h-36 md:w-28 md:h-40",
+        onClick && "cursor-pointer",
         className
       )}
-      whileHover={onClick ? { scale: 1.05, y: -4 } : {}}
-      whileTap={onClick ? { scale: 0.95 } : {}}
       onClick={onClick}
     >
       {isFlipped ? (
         // Card back design
-        <div className="w-full h-full rounded-2xl bg-gradient-to-br from-poker-green via-green-800 to-poker-green p-2">
-          <div className="w-full h-full rounded-xl border-2 border-white/20 bg-gradient-to-br from-green-700/50 to-poker-green/50 flex items-center justify-center">
-            <div className="text-white/40 font-bold text-[clamp(1rem,4vw,1.5rem)]">♠</div>
+        <div className="w-full h-full rounded-xl bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900 p-1.5">
+          <div className="w-full h-full rounded-lg border border-white/20 bg-[repeating-linear-gradient(45deg,transparent,transparent_4px,rgba(255,255,255,0.05)_4px,rgba(255,255,255,0.05)_8px)] flex items-center justify-center">
+            <div className="w-6 h-6 rounded-full bg-amber-500/80 flex items-center justify-center">
+              <span className="text-white font-bold text-xs">♠</span>
+            </div>
           </div>
         </div>
       ) : (
@@ -84,7 +84,7 @@ export function Card({ suit, rank, isFlipped = false, className, onClick }: Card
           </div>
         </>
       )}
-    </motion.div>
+    </div>
   );
 }
 

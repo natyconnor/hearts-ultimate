@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getRoomBySlug,
@@ -315,39 +315,62 @@ export function GameRoom() {
   // Show game table when playing
   if (roomStatus === "playing") {
     return (
-      <div className="relative w-full h-screen overflow-hidden">
-        {/* Header overlay */}
-        <div className="absolute top-4 left-4 right-4 z-50 flex items-center justify-between bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-4">
-          <div>
-            <h1 className="text-2xl font-bold text-poker-green">
-              Room: {slug}
-            </h1>
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <div
-                className={`w-2 h-2 rounded-full ${
-                  isConnected ? "bg-green-500" : "bg-red-500"
-                }`}
-              />
-              {isConnected ? "Connected" : "Disconnected"}
+      <div className="flex flex-col h-screen w-full overflow-hidden bg-gradient-to-b from-gray-800 to-gray-900">
+        <header className="relative z-50 flex-shrink-0 bg-black/40 backdrop-blur-md border-b border-white/10">
+          <div className="w-full px-4 md:px-6 lg:px-8 py-3 md:py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-6">
+                <Link
+                  to="/"
+                  className="text-white/80 hover:text-white transition-colors font-medium text-sm md:text-base"
+                >
+                  Home
+                </Link>
+                <div className="h-6 w-px bg-white/20" />
+                <div className="flex flex-col">
+                  <h1 className="text-lg md:text-xl lg:text-2xl font-bold text-white tracking-tight">
+                    {slug}
+                  </h1>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <div
+                      className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                        isConnected
+                          ? "bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.6)]"
+                          : "bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.6)]"
+                      }`}
+                    />
+                    <span
+                      className={`text-xs md:text-sm font-medium transition-colors ${
+                        isConnected ? "text-green-300" : "text-red-300"
+                      }`}
+                    >
+                      {isConnected ? "Connected" : "Disconnected"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              {canLeave && (
+                <button
+                  onClick={handleLeave}
+                  disabled={leaveRoomMutation.isPending}
+                  className="px-4 py-2 bg-red-500/90 hover:bg-red-500 text-white rounded-lg font-medium text-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+                >
+                  {leaveRoomMutation.isPending ? "Leaving..." : "Leave Game"}
+                </button>
+              )}
             </div>
           </div>
-          {canLeave && (
-            <button
-              onClick={handleLeave}
-              disabled={leaveRoomMutation.isPending}
-              className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50"
-            >
-              {leaveRoomMutation.isPending ? "Leaving..." : "Leave Game"}
-            </button>
-          )}
-        </div>
+        </header>
 
-        <GameTable
-          players={players}
-          currentPlayerId={currentPlayerId}
-          currentTrick={currentGameState?.currentTrick || []}
-          onCardClick={handleCardClick}
-        />
+        {/* Game Table - Takes remaining space */}
+        <div className="flex-1 min-h-0 relative">
+          <GameTable
+            players={players}
+            currentPlayerId={currentPlayerId}
+            currentTrick={currentGameState?.currentTrick || []}
+            onCardClick={handleCardClick}
+          />
+        </div>
       </div>
     );
   }

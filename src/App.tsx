@@ -14,6 +14,11 @@ const queryClient = new QueryClient();
 function Navbar() {
   const currentRoom = useGameStore((state) => state.currentRoom);
 
+  // Only show navbar when not in a game room
+  if (currentRoom.slug) {
+    return null;
+  }
+
   return (
     <nav
       style={{
@@ -25,7 +30,6 @@ function Navbar() {
       <Link to="/" style={{ marginRight: "1rem" }}>
         Home
       </Link>
-      {currentRoom.slug && <span>Current Room: {currentRoom.slug}</span>}
     </nav>
   );
 }

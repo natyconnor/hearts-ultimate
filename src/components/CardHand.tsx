@@ -10,38 +10,77 @@ interface CardHandProps {
   className?: string;
 }
 
-export function CardHand({ cards, isFlipped = false, onCardClick, className }: CardHandProps) {
+export function CardHand({
+  cards,
+  isFlipped = false,
+  onCardClick,
+  className,
+}: CardHandProps) {
   if (cards.length === 0) {
     return null;
   }
 
-  // Calculate rotation and offset for fanning effect
-  const maxRotation = 15;
-  const rotationStep = (maxRotation * 2) / (cards.length - 1 || 1);
-  const offsetStep = 30; // Horizontal offset between cards
+  const cardCount = cards.length;
+
+  // Adjust spread based on card count
+  const maxRotation = Math.min(25, cardCount * 2);
+  const cardSpacing = Math.min(60, 700 / cardCount);
+  const totalWidth = cardCount * cardSpacing;
 
   return (
-    <div className={cn("flex items-end justify-center relative h-40", className)}>
+    <div
+      className={cn("relative flex items-end justify-center", className)}
+      style={{
+        height: "clamp(180px, 15vh, 220px)",
+        width: `${Math.max(500, totalWidth + 100)}px`,
+        maxWidth: "95vw",
+      }}
+    >
       {cards.map((card, index) => {
-        const rotation = (index - (cards.length - 1) / 2) * rotationStep;
-        const offset = (index - (cards.length - 1) / 2) * offsetStep;
-        const zIndex = index;
+        // Calculate position from center
+        const centerIndex = (cardCount - 1) / 2;
+        const offsetFromCenter = index - centerIndex;
+
+        // Rotation: cards fan out from center
+        const rotation =
+          centerIndex > 0 ? (offsetFromCenter / centerIndex) * maxRotation : 0;
+
+        // Horizontal offset from center
+        const xOffset = offsetFromCenter * cardSpacing;
+
+        // Vertical offset: cards at edges are slightly lower (arc effect)
+        const yOffset = Math.abs(offsetFromCenter) * 4;
 
         return (
           <motion.div
             key={`${card.suit}-${card.rank}-${index}`}
-            className="absolute"
+            className={cn(
+              "absolute transition-all duration-100 ease-out",
+              onCardClick &&
+                "hover:scale-110 hover:-translate-y-8 hover:z-[100]"
+            )}
             style={{
-              transform: `translateX(${offset}px) rotate(${rotation}deg)`,
-              zIndex,
+              left: `calc(50% + ${xOffset}px)`,
+              bottom: `${yOffset}px`,
+              transform: `translateX(-50%) rotate(${rotation}deg)`,
+              transformOrigin: "center bottom",
+              zIndex: index,
             }}
-            initial={{ y: 100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: index * 0.05 }}
-            whileHover={{
-              y: -20,
+            initial={{
+              opacity: 0,
+              y: 50,
+              rotate: 0,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
               rotate: rotation,
-              zIndex: 1000,
+            }}
+            transition={{
+              type: "spring",
+              stiffness: 300,
+              damping: 25,
+              delay: index * 0.03,
             }}
           >
             <Card
@@ -49,6 +88,7 @@ export function CardHand({ cards, isFlipped = false, onCardClick, className }: C
               rank={card.rank}
               isFlipped={isFlipped}
               onClick={onCardClick ? () => onCardClick(card, index) : undefined}
+              className="shadow-xl"
             />
           </motion.div>
         );
@@ -56,4 +96,3 @@ export function CardHand({ cards, isFlipped = false, onCardClick, className }: C
     </div>
   );
 }
-
