@@ -13,6 +13,9 @@ import { useGameEndHandler } from "../hooks/useGameEndHandler";
 import { usePageUnloadWarning } from "../hooks/usePageUnloadWarning";
 import { useGameStore } from "../store/gameStore";
 import { STORAGE_KEYS } from "../lib/constants";
+import { createAIPlayersToFillSlots } from "../lib/aiPlayers";
+import { createAndDeal } from "../game/deck";
+import { formatHandGrouped } from "../game/cardDisplay";
 import type { GameState, Player } from "../types/game";
 
 export function GameRoom() {
@@ -133,6 +136,33 @@ export function GameRoom() {
     },
   });
 
+  const addAIPlayersMutation = useMutation({
+    mutationFn: async () => {
+      if (!slug || !room) throw new Error("Room not found");
+      const currentGameState = gameState ?? room.gameState;
+      const roomStatus = currentRoom.status ?? room.status;
+
+      if (roomStatus !== "waiting")
+        throw new Error("Cannot add AI players after game started");
+      if (currentGameState.players.length >= 4)
+        throw new Error("Room is already full");
+
+      const newAIPlayers = createAIPlayersToFillSlots(currentGameState.players);
+      const updatedGameState: GameState = {
+        ...currentGameState,
+        players: [...currentGameState.players, ...newAIPlayers],
+      };
+
+      await updateRoomGameState(slug, updatedGameState);
+
+      return updatedGameState;
+    },
+    onSuccess: (updatedGameState) => {
+      updateGameState(updatedGameState);
+      queryClient.invalidateQueries({ queryKey: ["room", slug] });
+    },
+  });
+
   const startGameMutation = useMutation({
     mutationFn: async () => {
       if (!slug || !room) throw new Error("Room not found");
@@ -143,6 +173,25 @@ export function GameRoom() {
       if (currentGameState.players.length !== 4)
         throw new Error("Need 4 players to start");
 
+      // Deal cards to all 4 players
+      const hands = createAndDeal();
+
+      // Assign hands to players and update their hand arrays
+      const playersWithHands = currentGameState.players.map(
+        (player, index) => ({
+          ...player,
+          hand: hands[index],
+        })
+      );
+
+      const updatedGameState: GameState = {
+        ...currentGameState,
+        players: playersWithHands,
+        hands: hands,
+      };
+
+      // Update game state with dealt cards, then update status
+      await updateRoomGameState(slug, updatedGameState);
       await updateRoomStatus(slug, "playing");
 
       setCurrentRoom({
@@ -151,9 +200,10 @@ export function GameRoom() {
         status: "playing",
       });
 
-      return room.gameState;
+      return updatedGameState;
     },
-    onSuccess: () => {
+    onSuccess: (updatedGameState) => {
+      updateGameState(updatedGameState);
       queryClient.invalidateQueries({ queryKey: ["room", slug] });
     },
   });
@@ -202,6 +252,19 @@ export function GameRoom() {
     }
   };
 
+  const handleAddAIPlayers = () => {
+    const slotsToFill = 4 - players.length;
+    if (
+      window.confirm(
+        `Add ${slotsToFill} AI player${
+          slotsToFill > 1 ? "s" : ""
+        } to fill empty slots?`
+      )
+    ) {
+      addAIPlayersMutation.mutate();
+    }
+  };
+
   const handleStartGame = () => {
     if (
       window.confirm(
@@ -220,6 +283,8 @@ export function GameRoom() {
 
   const canJoin =
     roomStatus === "waiting" && players.length < 4 && !isPlayerInRoom;
+  const canAddAI =
+    roomStatus === "waiting" && players.length < 4 && players.length > 0;
   const canStart =
     players.length === 4 && roomStatus === "waiting" && isPlayerInRoom;
   const canLeave = isPlayerInRoom && roomStatus === "waiting";
@@ -246,6 +311,9 @@ export function GameRoom() {
         {[0, 1, 2, 3].map((index) => {
           const player = players[index];
           const isCurrentPlayer = player?.id === currentPlayerId;
+          const hasCards = player && player.hand.length > 0;
+          const showCards = roomStatus === "playing" && hasCards;
+
           return (
             <div
               key={index}
@@ -258,8 +326,42 @@ export function GameRoom() {
             >
               {player ? (
                 <>
-                  <strong>{player.name}</strong> {player.isAI && "(AI)"}
-                  {isCurrentPlayer && " (You)"}
+                  <div>
+                    <strong>{player.name}</strong> {player.isAI && "(AI)"}
+                    {isCurrentPlayer && " (You)"}
+                    {hasCards && (
+                      <span style={{ marginLeft: "0.5rem", color: "#666" }}>
+                        ({player.hand.length} cards)
+                      </span>
+                    )}
+                  </div>
+                  {showCards && (
+                    <div
+                      style={{
+                        marginTop: "0.5rem",
+                        padding: "0.5rem",
+                        backgroundColor: isCurrentPlayer
+                          ? "#fff"
+                          : "rgba(0, 0, 0, 0.05)",
+                        borderRadius: "4px",
+                        fontFamily: "monospace",
+                        fontSize: "0.9rem",
+                      }}
+                    >
+                      {isCurrentPlayer ? (
+                        <div>
+                          <strong>Your hand:</strong>
+                          <div style={{ marginTop: "0.25rem" }}>
+                            {formatHandGrouped(player.hand)}
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ color: "#999" }}>
+                          Hand hidden ({player.hand.length} cards)
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               ) : (
                 <em>Empty</em>
@@ -272,6 +374,18 @@ export function GameRoom() {
       {canJoin && (
         <button onClick={handleJoin} disabled={joinRoomMutation.isPending}>
           {joinRoomMutation.isPending ? "Joining..." : "Join as Player"}
+        </button>
+      )}
+
+      {canAddAI && (
+        <button
+          onClick={handleAddAIPlayers}
+          disabled={addAIPlayersMutation.isPending}
+          style={{ marginLeft: canJoin ? "1rem" : "0" }}
+        >
+          {addAIPlayersMutation.isPending
+            ? "Adding AI..."
+            : `Add AI Player${4 - players.length > 1 ? "s" : ""}`}
         </button>
       )}
 
@@ -299,6 +413,14 @@ export function GameRoom() {
           {joinRoomMutation.error instanceof Error
             ? joinRoomMutation.error.message
             : "Failed to join"}
+        </p>
+      )}
+
+      {addAIPlayersMutation.isError && (
+        <p style={{ color: "red" }}>
+          {addAIPlayersMutation.error instanceof Error
+            ? addAIPlayersMutation.error.message
+            : "Failed to add AI players"}
         </p>
       )}
 

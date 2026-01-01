@@ -4,6 +4,31 @@ const SUITS: CardSuit[] = ["hearts", "diamonds", "clubs", "spades"];
 const RANKS: CardRank[] = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
 
 /**
+ * Suit order for sorting: clubs, diamonds, spades, hearts
+ */
+const SUIT_ORDER: Record<CardSuit, number> = {
+  clubs: 0,
+  diamonds: 1,
+  spades: 2,
+  hearts: 3,
+};
+
+/**
+ * Sorts a hand of cards by suit (clubs, diamonds, spades, hearts) then by rank (ascending)
+ */
+export function sortHand(hand: Card[]): Card[] {
+  return [...hand].sort((a, b) => {
+    // First sort by suit
+    const suitDiff = SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit];
+    if (suitDiff !== 0) {
+      return suitDiff;
+    }
+    // Then sort by rank (ascending)
+    return a.rank - b.rank;
+  });
+}
+
+/**
  * Generates a full 52-card deck
  */
 export function generateDeck(): Card[] {
@@ -30,7 +55,7 @@ export function shuffleDeck(deck: Card[]): Card[] {
 
 /**
  * Deals 13 cards to each of 4 players from a deck
- * Returns an array of 4 hands (each hand is an array of 13 cards)
+ * Returns an array of 4 hands (each hand is an array of 13 cards, sorted)
  */
 export function dealCards(deck: Card[]): Card[][] {
   if (deck.length !== 52) {
@@ -44,7 +69,8 @@ export function dealCards(deck: Card[]): Card[][] {
     hands[playerIndex].push(deck[i]);
   }
 
-  return hands;
+  // Sort each hand by suit (clubs, diamonds, spades, hearts) then by rank
+  return hands.map((hand) => sortHand(hand));
 }
 
 /**
