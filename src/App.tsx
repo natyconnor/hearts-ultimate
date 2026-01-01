@@ -1,80 +1,66 @@
-import { useEffect, useState } from "react";
-import { supabase } from "./supabaseClient";
-import "./App.css";
+import {
+  createBrowserRouter,
+  RouterProvider,
+  Link,
+  Outlet,
+} from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Home } from "./pages/Home";
+import { GameRoom } from "./pages/GameRoom";
+import { useGameStore } from "./store/gameStore";
 
-interface Note {
-  id: number;
-  content?: string;
-  created_at?: string;
-}
+const queryClient = new QueryClient();
 
-function App() {
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function fetchNotes() {
-      try {
-        setLoading(true);
-        const { data, error } = await supabase
-          .from("Notes")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        if (error) {
-          throw error;
-        }
-
-        setNotes(data || []);
-        setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to fetch notes");
-        console.error("Error fetching notes:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchNotes();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="container">
-        <h1>Notes</h1>
-        <p>Loading...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="container">
-        <h1>Notes</h1>
-        <p className="error">Error: {error}</p>
-      </div>
-    );
-  }
+function Navbar() {
+  const currentRoom = useGameStore((state) => state.currentRoom);
 
   return (
-    <div className="container">
-      <h1>Notes</h1>
-      {notes.length === 0 ? (
-        <p>No notes found.</p>
-      ) : (
-        <ul className="notes-list">
-          {notes.map((note) => (
-            <li key={note.id} className="note-item">
-              {note.content && <p>{note.content}</p>}
-              {note.created_at && (
-                <small>{new Date(note.created_at).toLocaleDateString()}</small>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+    <nav
+      style={{
+        padding: "1rem",
+        borderBottom: "1px solid #ccc",
+        marginBottom: "1rem",
+      }}
+    >
+      <Link to="/" style={{ marginRight: "1rem" }}>
+        Home
+      </Link>
+      {currentRoom.slug && <span>Current Room: {currentRoom.slug}</span>}
+    </nav>
+  );
+}
+
+function Layout() {
+  return (
+    <>
+      <Navbar />
+      <Outlet />
+    </>
+  );
+}
+
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <Layout />,
+    children: [
+      {
+        index: true,
+        element: <Home />,
+      },
+      {
+        path: "room/:slug",
+        element: <GameRoom />,
+      },
+    ],
+  },
+]);
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
   );
 }
 
