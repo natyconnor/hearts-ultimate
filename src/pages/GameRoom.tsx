@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { motion } from "framer-motion";
 import {
   getRoomBySlug,
   updateRoomGameState,
@@ -37,8 +36,8 @@ export function GameRoom() {
     localStorage.getItem(STORAGE_KEYS.PLAYER_ID)
   );
   const [selectedCard, setSelectedCard] = useState<CardType | null>(null);
-  const [confirmingCard, setConfirmingCard] = useState<CardType | null>(null);
   const [showCompletedTrick, setShowCompletedTrick] = useState(false);
+  const [animatingToWinner, setAnimatingToWinner] = useState(false);
   const cardHandRef = useRef<HTMLDivElement>(null);
 
   const { isConnected, error: realtimeError } = useGameRealtime(slug ?? null);
@@ -348,7 +347,15 @@ export function GameRoom() {
       ) {
         // Show the completed trick with winner highlight
         setShowCompletedTrick(true);
-        setTimeout(() => setShowCompletedTrick(false), 2000);
+        // Start animation to winner after a brief delay
+        setTimeout(() => {
+          setAnimatingToWinner(true);
+          // Clear trick after animation completes (animation is 300ms, add buffer for smooth transition)
+          setTimeout(() => {
+            setShowCompletedTrick(false);
+            setAnimatingToWinner(false);
+          }, 1000);
+        }, 600);
       }
 
       updateGameState(updatedGameState);
@@ -362,6 +369,7 @@ export function GameRoom() {
     if (roomStatus !== "playing") return;
     if (!currentGameState) return;
     if (playCardMutation.isPending) return; // Don't trigger if already playing
+    if (showCompletedTrick || animatingToWinner) return; // Wait for animation to complete
 
     const currentPlayerIndex = currentGameState.currentPlayerIndex;
     if (currentPlayerIndex === undefined) return;
@@ -388,26 +396,9 @@ export function GameRoom() {
     playCardMutation.isPending,
     playCardMutation,
     currentGameState,
+    showCompletedTrick,
+    animatingToWinner,
   ]);
-
-  // Handle click-away to deselect card
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        cardHandRef.current &&
-        !cardHandRef.current.contains(event.target as Node)
-      ) {
-        setSelectedCard(null);
-      }
-    };
-
-    if (selectedCard) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => {
-        document.removeEventListener("mousedown", handleClickOutside);
-      };
-    }
-  }, [selectedCard]);
 
   const handleCardClick = (card: CardType) => {
     if (!currentPlayerId) return;
@@ -424,23 +415,8 @@ export function GameRoom() {
       return;
     }
 
-    // If card is already selected, confirm play with animation
-    if (
-      selectedCard &&
-      selectedCard.suit === card.suit &&
-      selectedCard.rank === card.rank
-    ) {
-      setConfirmingCard(card);
-      // Small delay for animation, then play
-      setTimeout(() => {
-        playCardMutation.mutate({ card });
-        setConfirmingCard(null);
-      }, 300);
-      return;
-    }
-
-    // Otherwise, select the card
-    setSelectedCard(card);
+    // Play card immediately
+    playCardMutation.mutate({ card });
   };
 
   if (isLoading) {
@@ -522,25 +498,14 @@ export function GameRoom() {
               </div>
             </div>
           )}
-          {selectedCard && (
-            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50">
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-yellow-500 text-black px-4 py-2 rounded-lg shadow-lg font-semibold text-sm"
-              >
-                Card selected - Click again to confirm play
-              </motion.div>
-            </div>
-          )}
           <GameTable
             players={players}
             currentPlayerId={currentPlayerId}
             currentTrick={currentGameState?.currentTrick || []}
             gameState={currentGameState}
             selectedCard={selectedCard}
-            confirmingCard={confirmingCard}
             showCompletedTrick={showCompletedTrick}
+            animatingToWinner={animatingToWinner}
             cardHandRef={cardHandRef}
             onCardClick={handleCardClick}
           />

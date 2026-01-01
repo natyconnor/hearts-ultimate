@@ -11,8 +11,8 @@ interface GameTableProps {
   currentTrick: Array<{ playerId: string; card: CardType }>;
   gameState: GameState | null;
   selectedCard?: CardType | null;
-  confirmingCard?: CardType | null;
   showCompletedTrick?: boolean;
+  animatingToWinner?: boolean;
   cardHandRef?: React.RefObject<HTMLDivElement | null>;
   onCardClick?: (card: CardType, index: number) => void;
   className?: string;
@@ -24,8 +24,8 @@ export function GameTable({
   currentTrick,
   gameState,
   selectedCard,
-  confirmingCard,
   showCompletedTrick,
+  animatingToWinner,
   cardHandRef,
   onCardClick,
   className,
@@ -79,6 +79,28 @@ export function GameTable({
     return positions[playerIndex as keyof typeof positions] || { x: 0, y: 0 };
   };
 
+  // Get winner's position for animation (where cards should move to)
+  // These values should match the actual player hand positions relative to center
+  // Bottom: bottom-0 left-1/2 → roughly 50% down from center
+  // Top: top-2 left-1/2 → roughly 50% up from center
+  // Left: left-2 top-1/2 → roughly 50% left from center
+  // Right: right-2 top-1/2 → roughly 50% right from center
+  // Using calc based on viewport - the table is full height/width
+  const getWinnerPosition = (playerIndex: number) => {
+    // These need to go all the way to the edge where hands are
+    // Approximate: table height is ~100vh, hands are at edges
+    // From center (50%), bottom hand is at ~95%, top at ~5%
+    // So bottom = +45vh, top = -45vh, left = -45vw, right = +45vw
+    // Converting to approximate pixels for a typical screen:
+    const positions = {
+      0: { x: 0, y: "45vh" }, // Bottom - all the way to bottom player's hand
+      1: { x: "-45vw", y: 0 }, // Left - all the way to left player's hand
+      2: { x: 0, y: "-45vh" }, // Top - all the way to top player's hand
+      3: { x: "45vw", y: 0 }, // Right - all the way to right player's hand
+    };
+    return positions[playerIndex as keyof typeof positions] || { x: 0, y: 0 };
+  };
+
   // Determine which trick to display (current or last completed)
   const displayTrick =
     showCompletedTrick && gameState?.lastCompletedTrick
@@ -110,6 +132,20 @@ export function GameTable({
 
           {/* Inner border/rail effect */}
           <div className="absolute inset-4 rounded-2xl border-2 border-green-600/30" />
+
+          {/*
+            NOTE: The flying card animation was removed because it created a
+            SEPARATE card instead of animating the actual clicked card.
+
+            To properly animate the card from hand to center, you need to use
+            Framer Motion's layoutId on both:
+            1. The card in CardHand.tsx (when in hand)
+            2. The card in the trick area (when played)
+
+            Example: Add layoutId={`card-${card.suit}-${card.rank}`} to both
+            motion.div wrappers, and Framer Motion will automatically animate
+            the transition between positions.
+          */}
 
           {/* Center area for current trick */}
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
@@ -147,12 +183,21 @@ export function GameTable({
                         getCardPositionForPlayer(trickPlayerIndex);
                       const startPos = getPlayerStartPosition(trickPlayerIndex);
 
+                      // If animating to winner, calculate final position
+                      const winnerPos =
+                        animatingToWinner &&
+                        gameState?.lastTrickWinnerIndex !== undefined
+                          ? getWinnerPosition(gameState.lastTrickWinnerIndex)
+                          : null;
+
                       return (
                         <motion.div
                           key={`trick-${trickCard.playerId}-${trickCard.card.suit}-${trickCard.card.rank}`}
                           className={cn(
                             "absolute left-1/2 top-1/2",
-                            isWinning && "ring-4 ring-green-400 rounded-xl z-50"
+                            isWinning &&
+                              !animatingToWinner &&
+                              "ring-4 ring-green-400 rounded-xl z-50"
                           )}
                           style={{
                             marginLeft: -48, // Half of card width
@@ -166,7 +211,15 @@ export function GameTable({
                             rotate: -90,
                           }}
                           animate={
-                            isWinning
+                            animatingToWinner && winnerPos
+                              ? {
+                                  x: winnerPos.x,
+                                  y: winnerPos.y,
+                                  scale: 0,
+                                  opacity: 0,
+                                  rotate: 0,
+                                }
+                              : isWinning
                               ? {
                                   x: cardPos.x,
                                   y: cardPos.y,
@@ -182,11 +235,19 @@ export function GameTable({
                                   rotate: 0,
                                 }
                           }
-                          transition={{
-                            type: "spring",
-                            stiffness: 200,
-                            damping: 25,
-                          }}
+                          transition={
+                            animatingToWinner
+                              ? {
+                                  type: "tween",
+                                  duration: 0.3,
+                                  ease: "easeInOut",
+                                }
+                              : {
+                                  type: "spring",
+                                  stiffness: 200,
+                                  damping: 25,
+                                }
+                          }
                         >
                           <Card
                             suit={trickCard.card.suit}
@@ -220,7 +281,6 @@ export function GameTable({
                       : undefined
                   }
                   selectedCard={selectedCard}
-                  confirmingCard={confirmingCard}
                 />
                 <div
                   className={cn(

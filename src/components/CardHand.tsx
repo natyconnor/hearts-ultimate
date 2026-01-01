@@ -9,7 +9,6 @@ interface CardHandProps {
   onCardClick?: (card: CardType, index: number) => void;
   validCards?: CardType[];
   selectedCard?: CardType | null;
-  confirmingCard?: CardType | null;
   className?: string;
 }
 
@@ -19,7 +18,6 @@ export function CardHand({
   onCardClick,
   validCards,
   selectedCard,
-  confirmingCard,
   className,
 }: CardHandProps) {
   if (cards.length === 0) {
@@ -64,7 +62,8 @@ export function CardHand({
 
         return (
           <motion.div
-            key={`${card.suit}-${card.rank}-${index}`}
+            key={`${card.suit}-${card.rank}`}
+            layout
             className={cn(
               "absolute transition-all duration-100 ease-out",
               canClick &&
@@ -93,22 +92,30 @@ export function CardHand({
               rotate: rotation,
             }}
             transition={{
-              type: "spring",
-              stiffness: 300,
-              damping: 25,
-              delay: index * 0.03,
+              layout: {
+                type: "spring",
+                stiffness: 300,
+                damping: 30,
+              },
+              opacity: {
+                duration: 0.2,
+              },
+              y: {
+                type: "spring",
+                stiffness: 300,
+                damping: 25,
+              },
+              rotate: {
+                type: "spring",
+                stiffness: 300,
+                damping: 25,
+              },
             }}
           >
             <motion.div
               animate={
-                confirmingCard?.suit === card.suit &&
-                confirmingCard?.rank === card.rank
-                  ? {
-                      scale: [1.1, 1.3],
-                      rotate: [0, 180],
-                    }
-                  : selectedCard?.suit === card.suit &&
-                    selectedCard?.rank === card.rank
+                selectedCard?.suit === card.suit &&
+                selectedCard?.rank === card.rank
                   ? {
                       scale: 1.1,
                       y: -16,
@@ -116,11 +123,7 @@ export function CardHand({
                   : {}
               }
               transition={{
-                duration:
-                  confirmingCard?.suit === card.suit &&
-                  confirmingCard?.rank === card.rank
-                    ? 0.4
-                    : 0.2,
+                duration: 0.2,
                 ease: "easeInOut",
               }}
               style={{
@@ -128,9 +131,6 @@ export function CardHand({
                   selectedCard?.suit === card.suit &&
                   selectedCard?.rank === card.rank
                     ? 200
-                    : confirmingCard?.suit === card.suit &&
-                      confirmingCard?.rank === card.rank
-                    ? 300
                     : index,
               }}
             >
