@@ -9,15 +9,21 @@ import {
 import { useGameRealtime } from "../hooks/useGameRealtime";
 import { useRoomSync } from "../hooks/useRoomSync";
 import { useRoomNavigationBlocker } from "../hooks/useRoomNavigationBlocker";
-import { useGameEndHandler } from "../hooks/useGameEndHandler";
 import { usePageUnloadWarning } from "../hooks/usePageUnloadWarning";
 import { useGameStore } from "../store/gameStore";
 import { STORAGE_KEYS } from "../lib/constants";
 import { createAIPlayersToFillSlots } from "../lib/aiPlayers";
 import { chooseAICard } from "../lib/aiDecision";
 import { createAndDeal } from "../game/deck";
-import { initializeRound } from "../game/gameLogic";
+import {
+  initializeRound,
+  prepareNewRound,
+  resetGameForNewGame,
+} from "../game/gameLogic";
+import { checkShootingTheMoon } from "../game/rules";
 import { GameTable } from "../components/GameTable";
+import { GameEndOverlay } from "../components/GameEndOverlay";
+import { RoundSummaryOverlay } from "../components/RoundSummaryOverlay";
 import type { GameState, Player, Card as CardType } from "../types/game";
 
 export function GameRoom() {
@@ -38,6 +44,8 @@ export function GameRoom() {
   const [selectedCard, setSelectedCard] = useState<CardType | null>(null);
   const [showCompletedTrick, setShowCompletedTrick] = useState(false);
   const [animatingToWinner, setAnimatingToWinner] = useState(false);
+  const [showRoundSummary, setShowRoundSummary] = useState(false);
+  const [showGameEnd, setShowGameEnd] = useState(false);
   const cardHandRef = useRef<HTMLDivElement>(null);
 
   const { isConnected, error: realtimeError } = useGameRealtime(slug ?? null);
@@ -93,8 +101,6 @@ export function GameRoom() {
     roomStatus,
     enabled: !!(slug && room && currentPlayerId),
   });
-
-  useGameEndHandler({ room, isPlayerInRoom });
 
   const joinRoomMutation = useMutation({
     mutationFn: async (playerName: string) => {
@@ -195,6 +201,10 @@ export function GameRoom() {
         players: playersWithHands,
         hands: hands,
         roundScores: [0, 0, 0, 0],
+        roundNumber: 1,
+        isRoundComplete: false,
+        isGameOver: false,
+        winnerIndex: undefined,
       };
 
       // Initialize round (set first player who has 2 of clubs)
@@ -254,6 +264,62 @@ export function GameRoom() {
       navigate("/");
     },
   });
+
+  // Start next round mutation
+  const nextRoundMutation = useMutation({
+    mutationFn: async () => {
+      if (!slug || !room) throw new Error("Room not found");
+      const currentGameState = gameState ?? room.gameState;
+
+      // Deal new cards
+      const newHands = createAndDeal();
+
+      // Prepare the new round with dealt cards
+      const updatedGameState = prepareNewRound(currentGameState, newHands);
+
+      await updateRoomGameState(slug, updatedGameState);
+
+      return updatedGameState;
+    },
+    onSuccess: (updatedGameState) => {
+      setShowRoundSummary(false);
+      updateGameState(updatedGameState);
+      queryClient.invalidateQueries({ queryKey: ["room", slug] });
+    },
+  });
+
+  // Start a completely new game mutation
+  const newGameMutation = useMutation({
+    mutationFn: async () => {
+      if (!slug || !room) throw new Error("Room not found");
+      const currentGameState = gameState ?? room.gameState;
+
+      // Deal new cards
+      const newHands = createAndDeal();
+
+      // Reset the game completely
+      const updatedGameState = resetGameForNewGame(currentGameState, newHands);
+
+      // Make sure room status is "playing"
+      await updateRoomStatus(slug, "playing");
+      await updateRoomGameState(slug, updatedGameState);
+
+      return updatedGameState;
+    },
+    onSuccess: (updatedGameState) => {
+      setShowGameEnd(false);
+      updateGameState(updatedGameState);
+      queryClient.invalidateQueries({ queryKey: ["room", slug] });
+    },
+  });
+
+  // Handle going home from game end screen
+  const handleGoHome = () => {
+    localStorage.removeItem(STORAGE_KEYS.PLAYER_ID);
+    localStorage.removeItem(STORAGE_KEYS.PLAYER_NAME);
+    clearCurrentRoom();
+    navigate("/");
+  };
 
   const handleJoin = () => {
     const playerName = prompt("Enter your name:");
@@ -350,10 +416,22 @@ export function GameRoom() {
         // Start animation to winner after a brief delay
         setTimeout(() => {
           setAnimatingToWinner(true);
-          // Clear trick after animation completes (animation is 300ms, add buffer for smooth transition)
+          // Clear trick after animation completes, then check for round/game end
           setTimeout(() => {
             setShowCompletedTrick(false);
             setAnimatingToWinner(false);
+
+            // Check if game ended (someone reached 100+ points)
+            if (
+              updatedGameState.isGameOver &&
+              updatedGameState.winnerIndex !== undefined
+            ) {
+              setShowGameEnd(true);
+            }
+            // Check if round ended (but game continues)
+            else if (updatedGameState.isRoundComplete) {
+              setShowRoundSummary(true);
+            }
           }, 1000);
         }, 600);
       }
@@ -370,6 +448,8 @@ export function GameRoom() {
     if (!currentGameState) return;
     if (playCardMutation.isPending) return; // Don't trigger if already playing
     if (showCompletedTrick || animatingToWinner) return; // Wait for animation to complete
+    if (showRoundSummary || showGameEnd) return; // Don't play during overlays
+    if (currentGameState.isRoundComplete || currentGameState.isGameOver) return; // Round/game ended
 
     const currentPlayerIndex = currentGameState.currentPlayerIndex;
     if (currentPlayerIndex === undefined) return;
@@ -392,12 +472,16 @@ export function GameRoom() {
   }, [
     currentGameState?.currentPlayerIndex,
     currentGameState?.currentTrick.length,
+    currentGameState?.isRoundComplete,
+    currentGameState?.isGameOver,
     roomStatus,
     playCardMutation.isPending,
     playCardMutation,
     currentGameState,
     showCompletedTrick,
     animatingToWinner,
+    showRoundSummary,
+    showGameEnd,
   ]);
 
   const handleCardClick = (card: CardType) => {
@@ -510,6 +594,41 @@ export function GameRoom() {
             onCardClick={handleCardClick}
           />
         </div>
+
+        {/* Round Summary Overlay */}
+        {showRoundSummary && currentGameState && (
+          <RoundSummaryOverlay
+            players={players}
+            roundNumber={currentGameState.roundNumber}
+            roundScores={currentGameState.roundScores}
+            totalScores={currentGameState.scores}
+            shotTheMoon={
+              checkShootingTheMoon(currentGameState.roundScores).shot
+                ? {
+                    playerIndex: checkShootingTheMoon(
+                      currentGameState.roundScores
+                    ).playerIndex!,
+                  }
+                : null
+            }
+            onNextRound={() => nextRoundMutation.mutate()}
+            isLoading={nextRoundMutation.isPending}
+          />
+        )}
+
+        {/* Game End Overlay */}
+        {showGameEnd &&
+          currentGameState &&
+          currentGameState.winnerIndex !== undefined && (
+            <GameEndOverlay
+              players={players}
+              scores={currentGameState.scores}
+              winnerIndex={currentGameState.winnerIndex}
+              onNewGame={() => newGameMutation.mutate()}
+              onGoHome={handleGoHome}
+              isLoading={newGameMutation.isPending}
+            />
+          )}
       </div>
     );
   }

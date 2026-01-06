@@ -28,6 +28,10 @@ export interface GameState {
   currentPlayerIndex?: number;
   dealerIndex?: number;
   trickLeaderIndex?: number; // Index of player who led the current trick
+  roundNumber: number; // Current round number (1-based)
+  isRoundComplete?: boolean; // Flag to indicate round just completed (for UI)
+  isGameOver?: boolean; // Flag to indicate game has ended (someone reached 100+ points)
+  winnerIndex?: number; // Index of the winning player (lowest score when game ends)
 }
 
 export interface GameRoom {

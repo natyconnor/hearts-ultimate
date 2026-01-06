@@ -10,6 +10,10 @@ const initialGameState: GameState = {
   scores: [0, 0, 0, 0],
   roundScores: [0, 0, 0, 0],
   heartsBroken: false,
+  roundNumber: 1,
+  isRoundComplete: false,
+  isGameOver: false,
+  winnerIndex: undefined,
 };
 
 /**
@@ -65,7 +69,6 @@ export async function getRoomBySlug(slug: string): Promise<GameRoom | null> {
     createdAt: data.created_at,
   };
 }
-
 
 /**
  * Updates the game state for a room

@@ -87,6 +87,10 @@ export const useGameStore = create<GameStore>((set) => ({
             scores: [0, 0, 0, 0],
             roundScores: [0, 0, 0, 0],
             heartsBroken: false,
+            roundNumber: 1,
+            isRoundComplete: false,
+            isGameOver: false,
+            winnerIndex: undefined,
           };
       return {
         players: updatedPlayers,

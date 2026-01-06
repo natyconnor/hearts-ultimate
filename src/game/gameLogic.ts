@@ -1,4 +1,4 @@
-import type { Card, GameState, Player } from "../types/game";
+import type { Card, GameState } from "../types/game";
 import {
   canPlayCard,
   getTrickWinner,
@@ -65,10 +65,7 @@ export function playCard(
   updatedHands[playerIndex] = updatedHand;
 
   // Add card to trick
-  const updatedTrick = [
-    ...gameState.currentTrick,
-    { playerId, card },
-  ];
+  const updatedTrick = [...gameState.currentTrick, { playerId, card }];
 
   // Update hearts broken status
   const newHeartsBroken = shouldBreakHearts(card, gameState.heartsBroken);
@@ -129,6 +126,15 @@ export function playCard(
       // Check if game is over (someone has 100+ points)
       const gameOver = updatedScores.some((score) => score >= 100);
 
+      // Find game winner (player with lowest score)
+      let gameWinnerIndex: number | undefined;
+      if (gameOver) {
+        const minScore = Math.min(...updatedScores);
+        gameWinnerIndex = updatedScores.findIndex(
+          (score) => score === minScore
+        );
+      }
+
       finalGameState = {
         ...finalGameState,
         currentTrick: [],
@@ -138,6 +144,9 @@ export function playCard(
         scores: updatedScores,
         currentPlayerIndex: undefined,
         trickLeaderIndex: undefined,
+        isRoundComplete: true,
+        isGameOver: gameOver,
+        winnerIndex: gameWinnerIndex,
       };
 
       // If game is over, we'll handle status update in the component
@@ -192,6 +201,62 @@ export function initializeRound(gameState: GameState): GameState {
     lastTrickWinnerIndex: undefined,
     roundScores: [0, 0, 0, 0],
     heartsBroken: false,
+    isRoundComplete: false,
+    isGameOver: false,
+    winnerIndex: undefined,
   };
 }
 
+/**
+ * Prepares a new round after the previous round ends
+ * Deals new cards and sets up for play
+ */
+export function prepareNewRound(
+  gameState: GameState,
+  newHands: Card[][]
+): GameState {
+  // Assign hands to players
+  const playersWithHands = gameState.players.map((player, index) => ({
+    ...player,
+    hand: newHands[index],
+  }));
+
+  const newGameState: GameState = {
+    ...gameState,
+    players: playersWithHands,
+    hands: newHands,
+    roundNumber: gameState.roundNumber + 1,
+    isRoundComplete: false,
+  };
+
+  return initializeRound(newGameState);
+}
+
+/**
+ * Resets the game for a completely new game with the same players
+ */
+export function resetGameForNewGame(
+  gameState: GameState,
+  newHands: Card[][]
+): GameState {
+  // Assign hands to players and reset scores
+  const playersWithHands = gameState.players.map((player, index) => ({
+    ...player,
+    hand: newHands[index],
+    score: 0,
+  }));
+
+  const newGameState: GameState = {
+    ...gameState,
+    players: playersWithHands,
+    hands: newHands,
+    scores: [0, 0, 0, 0],
+    roundScores: [0, 0, 0, 0],
+    roundNumber: 1,
+    isRoundComplete: false,
+    isGameOver: false,
+    winnerIndex: undefined,
+  };
+
+  return initializeRound(newGameState);
+}
