@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -13,17 +13,28 @@ import { usePageUnloadWarning } from "../hooks/usePageUnloadWarning";
 import { useGameStore } from "../store/gameStore";
 import { STORAGE_KEYS } from "../lib/constants";
 import { createAIPlayersToFillSlots } from "../lib/aiPlayers";
-import { chooseAICard } from "../lib/aiDecision";
+import { chooseAICard, chooseAICardsToPass } from "../lib/aiDecision";
 import { createAndDeal } from "../game/deck";
 import {
-  initializeRound,
   prepareNewRound,
   resetGameForNewGame,
+  startRoundWithPassingPhase,
+  finalizePassingPhase,
+  completeRevealPhase,
 } from "../game/gameLogic";
+import {
+  submitPassSelection,
+  executePassPhase,
+  allPlayersHavePassed,
+  hasPlayerSubmittedPass,
+  processAIPasses,
+} from "../game/passingLogic";
 import { checkShootingTheMoon } from "../game/rules";
 import { GameTable } from "../components/GameTable";
 import { GameEndOverlay } from "../components/GameEndOverlay";
 import { RoundSummaryOverlay } from "../components/RoundSummaryOverlay";
+import { PassingPhaseOverlay } from "../components/PassingPhaseOverlay";
+import { ReceivedCardsOverlay } from "../components/ReceivedCardsOverlay";
 import type { GameState, Player, Card as CardType } from "../types/game";
 
 export function GameRoom() {
@@ -46,6 +57,9 @@ export function GameRoom() {
   const [animatingToWinner, setAnimatingToWinner] = useState(false);
   const [showRoundSummary, setShowRoundSummary] = useState(false);
   const [showGameEnd, setShowGameEnd] = useState(false);
+  const [selectedCardsToPass, setSelectedCardsToPass] = useState<CardType[]>(
+    []
+  );
   const cardHandRef = useRef<HTMLDivElement>(null);
 
   const { isConnected, error: realtimeError } = useGameRealtime(slug ?? null);
@@ -188,18 +202,9 @@ export function GameRoom() {
       // Deal cards to all 4 players
       const hands = createAndDeal();
 
-      // Assign hands to players and update their hand arrays
-      const playersWithHands = currentGameState.players.map(
-        (player, index) => ({
-          ...player,
-          hand: hands[index],
-        })
-      );
-
+      // Set up initial game state
       let updatedGameState: GameState = {
         ...currentGameState,
-        players: playersWithHands,
-        hands: hands,
         roundScores: [0, 0, 0, 0],
         roundNumber: 1,
         isRoundComplete: false,
@@ -207,8 +212,25 @@ export function GameRoom() {
         winnerIndex: undefined,
       };
 
-      // Initialize round (set first player who has 2 of clubs)
-      updatedGameState = initializeRound(updatedGameState);
+      // Start round with passing phase (or play if direction is "none")
+      updatedGameState = startRoundWithPassingPhase(updatedGameState, hands);
+
+      // Process AI passes immediately (they don't need to "think")
+      if (updatedGameState.isPassingPhase) {
+        updatedGameState = processAIPasses(
+          updatedGameState,
+          chooseAICardsToPass
+        );
+
+        // If all players have now passed (e.g., all AI game), finalize
+        if (allPlayersHavePassed(updatedGameState)) {
+          const executeResult = executePassPhase(updatedGameState);
+          if (!executeResult.error) {
+            updatedGameState = executeResult.gameState;
+            updatedGameState = finalizePassingPhase(updatedGameState);
+          }
+        }
+      }
 
       // Update game state with dealt cards, then update status
       await updateRoomGameState(slug, updatedGameState);
@@ -223,6 +245,7 @@ export function GameRoom() {
       return updatedGameState;
     },
     onSuccess: (updatedGameState) => {
+      setSelectedCardsToPass([]); // Reset pass selection
       updateGameState(updatedGameState);
       queryClient.invalidateQueries({ queryKey: ["room", slug] });
     },
@@ -275,7 +298,24 @@ export function GameRoom() {
       const newHands = createAndDeal();
 
       // Prepare the new round with dealt cards
-      const updatedGameState = prepareNewRound(currentGameState, newHands);
+      let updatedGameState = prepareNewRound(currentGameState, newHands);
+
+      // Process AI passes immediately if in passing phase
+      if (updatedGameState.isPassingPhase) {
+        updatedGameState = processAIPasses(
+          updatedGameState,
+          chooseAICardsToPass
+        );
+
+        // If all players have now passed (e.g., all AI game), finalize
+        if (allPlayersHavePassed(updatedGameState)) {
+          const executeResult = executePassPhase(updatedGameState);
+          if (!executeResult.error) {
+            updatedGameState = executeResult.gameState;
+            updatedGameState = finalizePassingPhase(updatedGameState);
+          }
+        }
+      }
 
       await updateRoomGameState(slug, updatedGameState);
 
@@ -283,6 +323,65 @@ export function GameRoom() {
     },
     onSuccess: (updatedGameState) => {
       setShowRoundSummary(false);
+      setSelectedCardsToPass([]); // Reset pass selection for new round
+      updateGameState(updatedGameState);
+      queryClient.invalidateQueries({ queryKey: ["room", slug] });
+    },
+  });
+
+  // Submit pass selection mutation
+  const submitPassMutation = useMutation({
+    mutationFn: async (cards: CardType[]) => {
+      if (!slug || !room || !currentPlayerId) throw new Error("Not in room");
+      const currentGameState = gameState ?? room.gameState;
+
+      // Submit this player's pass selection
+      const result = submitPassSelection(
+        currentGameState,
+        currentPlayerId,
+        cards
+      );
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      let updatedGameState = result.gameState;
+
+      // Check if all players have now passed
+      if (allPlayersHavePassed(updatedGameState)) {
+        // Execute the pass phase - swap cards between players
+        // This enters reveal phase (shows received cards)
+        const executeResult = executePassPhase(updatedGameState);
+        if (executeResult.error) {
+          throw new Error(executeResult.error);
+        }
+        updatedGameState = executeResult.gameState;
+        // Don't finalize yet - let player see received cards first
+      }
+
+      await updateRoomGameState(slug, updatedGameState);
+      return updatedGameState;
+    },
+    onSuccess: (updatedGameState) => {
+      updateGameState(updatedGameState);
+      queryClient.invalidateQueries({ queryKey: ["room", slug] });
+    },
+  });
+
+  // Complete reveal phase and start play
+  const completeRevealMutation = useMutation({
+    mutationFn: async () => {
+      if (!slug || !room) throw new Error("Room not found");
+      const currentGameState = gameState ?? room.gameState;
+
+      // Complete the reveal phase and start play
+      const updatedGameState = completeRevealPhase(currentGameState);
+
+      await updateRoomGameState(slug, updatedGameState);
+      return updatedGameState;
+    },
+    onSuccess: (updatedGameState) => {
+      setSelectedCardsToPass([]); // Clear selection
       updateGameState(updatedGameState);
       queryClient.invalidateQueries({ queryKey: ["room", slug] });
     },
@@ -298,7 +397,24 @@ export function GameRoom() {
       const newHands = createAndDeal();
 
       // Reset the game completely
-      const updatedGameState = resetGameForNewGame(currentGameState, newHands);
+      let updatedGameState = resetGameForNewGame(currentGameState, newHands);
+
+      // Process AI passes immediately if in passing phase
+      if (updatedGameState.isPassingPhase) {
+        updatedGameState = processAIPasses(
+          updatedGameState,
+          chooseAICardsToPass
+        );
+
+        // If all players have now passed (e.g., all AI game), finalize
+        if (allPlayersHavePassed(updatedGameState)) {
+          const executeResult = executePassPhase(updatedGameState);
+          if (!executeResult.error) {
+            updatedGameState = executeResult.gameState;
+            updatedGameState = finalizePassingPhase(updatedGameState);
+          }
+        }
+      }
 
       // Make sure room status is "playing"
       await updateRoomStatus(slug, "playing");
@@ -308,10 +424,37 @@ export function GameRoom() {
     },
     onSuccess: (updatedGameState) => {
       setShowGameEnd(false);
+      setSelectedCardsToPass([]); // Reset pass selection for new game
       updateGameState(updatedGameState);
       queryClient.invalidateQueries({ queryKey: ["room", slug] });
     },
   });
+
+  // Handle toggling a card for passing
+  const handlePassCardToggle = useCallback((card: CardType) => {
+    setSelectedCardsToPass((prev) => {
+      const isSelected = prev.some(
+        (c) => c.suit === card.suit && c.rank === card.rank
+      );
+      if (isSelected) {
+        // Remove the card
+        return prev.filter(
+          (c) => !(c.suit === card.suit && c.rank === card.rank)
+        );
+      } else if (prev.length < 3) {
+        // Add the card
+        return [...prev, card];
+      }
+      return prev;
+    });
+  }, []);
+
+  // Handle confirming pass selection
+  const handleConfirmPass = useCallback(() => {
+    if (selectedCardsToPass.length === 3) {
+      submitPassMutation.mutate(selectedCardsToPass);
+    }
+  }, [selectedCardsToPass, submitPassMutation]);
 
   // Handle going home from game end screen
   const handleGoHome = () => {
@@ -446,6 +589,7 @@ export function GameRoom() {
   useEffect(() => {
     if (roomStatus !== "playing") return;
     if (!currentGameState) return;
+    if (currentGameState.isPassingPhase) return; // Don't play during passing phase
     if (playCardMutation.isPending) return; // Don't trigger if already playing
     if (showCompletedTrick || animatingToWinner) return; // Wait for animation to complete
     if (showRoundSummary || showGameEnd) return; // Don't play during overlays
@@ -474,6 +618,7 @@ export function GameRoom() {
     currentGameState?.currentTrick.length,
     currentGameState?.isRoundComplete,
     currentGameState?.isGameOver,
+    currentGameState?.isPassingPhase,
     roomStatus,
     playCardMutation.isPending,
     playCardMutation,
@@ -629,6 +774,69 @@ export function GameRoom() {
               isLoading={newGameMutation.isPending}
             />
           )}
+
+        {/* Passing Phase Overlay */}
+        {currentGameState?.isPassingPhase &&
+          currentGameState.passDirection &&
+          currentGameState.passDirection !== "none" &&
+          currentPlayerId &&
+          (() => {
+            const playerIndex = players.findIndex(
+              (p) => p.id === currentPlayerId
+            );
+            if (playerIndex === -1) return null;
+
+            const hasSubmitted = hasPlayerSubmittedPass(
+              currentGameState,
+              currentPlayerId
+            );
+            const waitingForPlayers = players
+              .filter(
+                (p) =>
+                  !p.isAI && !hasPlayerSubmittedPass(currentGameState, p.id)
+              )
+              .map((p) => p.name);
+
+            return (
+              <PassingPhaseOverlay
+                players={players}
+                currentPlayerIndex={playerIndex}
+                passDirection={currentGameState.passDirection}
+                selectedCards={selectedCardsToPass}
+                onCardToggle={handlePassCardToggle}
+                onConfirmPass={handleConfirmPass}
+                isSubmitting={submitPassMutation.isPending}
+                hasSubmitted={hasSubmitted}
+                waitingForPlayers={waitingForPlayers}
+              />
+            );
+          })()}
+
+        {/* Reveal Phase Overlay - Shows received cards */}
+        {currentGameState?.isRevealPhase &&
+          currentGameState.passDirection &&
+          currentGameState.receivedCards &&
+          currentPlayerId &&
+          (() => {
+            const playerIndex = players.findIndex(
+              (p) => p.id === currentPlayerId
+            );
+            if (playerIndex === -1) return null;
+
+            const receivedCards =
+              currentGameState.receivedCards[playerIndex] || [];
+
+            return (
+              <ReceivedCardsOverlay
+                players={players}
+                currentPlayerIndex={playerIndex}
+                passDirection={currentGameState.passDirection}
+                receivedCards={receivedCards}
+                onReady={() => completeRevealMutation.mutate()}
+                isLoading={completeRevealMutation.isPending}
+              />
+            );
+          })()}
       </div>
     );
   }

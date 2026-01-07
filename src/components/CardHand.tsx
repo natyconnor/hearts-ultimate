@@ -127,11 +127,7 @@ export function CardHand({
                 ease: "easeInOut",
               }}
               style={{
-                zIndex:
-                  selectedCard?.suit === card.suit &&
-                  selectedCard?.rank === card.rank
-                    ? 200
-                    : index,
+                zIndex: index, // Maintain natural layering order
               }}
             >
               <Card

@@ -235,7 +235,7 @@ export function applyShootingTheMoon(
   roundScores: number[],
   moonShooterIndex: number
 ): number[] {
-  const newScores = roundScores.map((score, index) =>
+  const newScores = roundScores.map((_, index) =>
     index === moonShooterIndex ? 0 : 26
   );
   return newScores;

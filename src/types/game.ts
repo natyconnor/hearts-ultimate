@@ -16,6 +16,15 @@ export interface Player {
   score: number;
 }
 
+// Pass direction rotates each round: left, right, across, none (hold)
+export type PassDirection = "left" | "right" | "across" | "none";
+
+// Tracks which cards each player has selected/submitted to pass
+export interface PassSubmission {
+  playerId: string;
+  cards: Card[];
+}
+
 export interface GameState {
   players: Player[];
   hands: Card[][]; // Array of hands, one per player (indexed by player index)
@@ -32,6 +41,14 @@ export interface GameState {
   isRoundComplete?: boolean; // Flag to indicate round just completed (for UI)
   isGameOver?: boolean; // Flag to indicate game has ended (someone reached 100+ points)
   winnerIndex?: number; // Index of the winning player (lowest score when game ends)
+  // Passing phase fields
+  passDirection?: PassDirection; // Current round's pass direction
+  isPassingPhase?: boolean; // True when in passing phase, false during play
+  passSubmissions?: PassSubmission[]; // Cards each player has submitted to pass
+
+  // Reveal phase fields (after passing, before play)
+  isRevealPhase?: boolean; // True when showing received cards
+  receivedCards?: Card[][]; // Cards each player received (indexed by player index)
 }
 
 export interface GameRoom {

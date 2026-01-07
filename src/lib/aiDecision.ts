@@ -1,5 +1,59 @@
 import type { Card, GameState } from "../types/game";
-import { getValidCards, getLeadSuit, isFirstTrick } from "../game/rules";
+import {
+  getValidCards,
+  getLeadSuit,
+  isFirstTrick,
+  isQueenOfSpades,
+  isHeart,
+} from "../game/rules";
+
+/**
+ * AI logic for choosing cards to pass during the passing phase
+ * Strategy: Pass high cards, especially penalty cards (Q♠, high hearts)
+ * @param hand - The AI player's hand
+ * @returns Array of 3 cards to pass
+ */
+export function chooseAICardsToPass(hand: Card[]): Card[] {
+  if (hand.length < 3) {
+    return hand.slice(0, 3); // Shouldn't happen, but safety
+  }
+
+  // Score each card based on how much we want to get rid of it
+  // Higher score = want to pass it more
+  const scoredCards = hand.map((card) => {
+    let score = 0;
+
+    // Queen of spades - definitely pass it (unless we have low spades to protect)
+    if (isQueenOfSpades(card)) {
+      score += 100;
+    }
+
+    // High hearts - we want to pass these
+    if (isHeart(card)) {
+      score += 20 + card.rank; // Hearts are bad, higher rank = worse
+    }
+
+    // High cards in general are risky (might win tricks we don't want)
+    score += card.rank;
+
+    // Ace and King of spades are dangerous if we don't have Q♠
+    if (card.suit === "spades" && card.rank >= 13) {
+      // If we have Q♠, keep high spades to possibly shoot the moon
+      const hasQueenOfSpades = hand.some(isQueenOfSpades);
+      if (!hasQueenOfSpades) {
+        score += 15; // Pass high spades if we don't have queen
+      }
+    }
+
+    return { card, score };
+  });
+
+  // Sort by score descending (highest score = want to pass most)
+  scoredCards.sort((a, b) => b.score - a.score);
+
+  // Return the top 3 cards
+  return scoredCards.slice(0, 3).map((sc) => sc.card);
+}
 
 /**
  * Simple AI strategy: Easy difficulty

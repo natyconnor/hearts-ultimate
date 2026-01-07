@@ -11,6 +11,7 @@ import {
   findPlayerWithTwoOfClubs,
   isFirstTrick,
 } from "./rules";
+import { getPassDirection } from "./passingLogic";
 
 /**
  * Plays a card and updates the game state
@@ -204,17 +205,21 @@ export function initializeRound(gameState: GameState): GameState {
     isRoundComplete: false,
     isGameOver: false,
     winnerIndex: undefined,
+    isPassingPhase: false,
+    passSubmissions: undefined,
   };
 }
 
 /**
- * Prepares a new round after the previous round ends
- * Deals new cards and sets up for play
+ * Starts a round with the passing phase (or skips to play if direction is "none")
+ * Called when starting the game initially
  */
-export function prepareNewRound(
+export function startRoundWithPassingPhase(
   gameState: GameState,
   newHands: Card[][]
 ): GameState {
+  const passDirection = getPassDirection(gameState.roundNumber);
+
   // Assign hands to players
   const playersWithHands = gameState.players.map((player, index) => ({
     ...player,
@@ -225,11 +230,100 @@ export function prepareNewRound(
     ...gameState,
     players: playersWithHands,
     hands: newHands,
-    roundNumber: gameState.roundNumber + 1,
-    isRoundComplete: false,
+    passDirection,
+    isPassingPhase: passDirection !== "none",
+    passSubmissions: passDirection !== "none" ? [] : undefined,
   };
 
-  return initializeRound(newGameState);
+  // If no passing this round, initialize for play immediately
+  if (passDirection === "none") {
+    return initializeRound(newGameState);
+  }
+
+  // Stay in passing phase - don't set current player yet
+  return {
+    ...newGameState,
+    currentPlayerIndex: undefined,
+    trickLeaderIndex: undefined,
+    currentTrick: [],
+    lastCompletedTrick: undefined,
+    lastTrickWinnerIndex: undefined,
+    roundScores: [0, 0, 0, 0],
+    heartsBroken: false,
+    isRoundComplete: false,
+    isGameOver: false,
+    winnerIndex: undefined,
+  };
+}
+
+/**
+ * Finalizes the passing phase and transitions to play
+ * Called after all passes have been executed (skips reveal phase for AI-only games)
+ */
+export function finalizePassingPhase(gameState: GameState): GameState {
+  return initializeRound({
+    ...gameState,
+    isRevealPhase: false,
+    receivedCards: undefined,
+  });
+}
+
+/**
+ * Completes the reveal phase and starts play
+ * Called when player clicks "Ready to Play" after seeing received cards
+ */
+export function completeRevealPhase(gameState: GameState): GameState {
+  return initializeRound({
+    ...gameState,
+    isRevealPhase: false,
+    receivedCards: undefined,
+  });
+}
+
+/**
+ * Prepares a new round after the previous round ends
+ * Deals new cards and sets up for passing phase (or play if no passing)
+ */
+export function prepareNewRound(
+  gameState: GameState,
+  newHands: Card[][]
+): GameState {
+  const newRoundNumber = gameState.roundNumber + 1;
+  const passDirection = getPassDirection(newRoundNumber);
+
+  // Assign hands to players
+  const playersWithHands = gameState.players.map((player, index) => ({
+    ...player,
+    hand: newHands[index],
+  }));
+
+  const newGameState: GameState = {
+    ...gameState,
+    players: playersWithHands,
+    hands: newHands,
+    roundNumber: newRoundNumber,
+    isRoundComplete: false,
+    passDirection,
+    isPassingPhase: passDirection !== "none",
+    passSubmissions: passDirection !== "none" ? [] : undefined,
+  };
+
+  // If no passing this round, initialize for play immediately
+  if (passDirection === "none") {
+    return initializeRound(newGameState);
+  }
+
+  // Otherwise, stay in passing phase (don't set currentPlayerIndex yet)
+  return {
+    ...newGameState,
+    currentPlayerIndex: undefined,
+    trickLeaderIndex: undefined,
+    currentTrick: [],
+    lastCompletedTrick: undefined,
+    lastTrickWinnerIndex: undefined,
+    roundScores: [0, 0, 0, 0],
+    heartsBroken: false,
+  };
 }
 
 /**
@@ -239,6 +333,8 @@ export function resetGameForNewGame(
   gameState: GameState,
   newHands: Card[][]
 ): GameState {
+  const passDirection = getPassDirection(1); // Round 1 = pass left
+
   // Assign hands to players and reset scores
   const playersWithHands = gameState.players.map((player, index) => ({
     ...player,
@@ -256,7 +352,24 @@ export function resetGameForNewGame(
     isRoundComplete: false,
     isGameOver: false,
     winnerIndex: undefined,
+    passDirection,
+    isPassingPhase: passDirection !== "none",
+    passSubmissions: passDirection !== "none" ? [] : undefined,
   };
 
-  return initializeRound(newGameState);
+  // If no passing this round (shouldn't happen for round 1, but just in case)
+  if (passDirection === "none") {
+    return initializeRound(newGameState);
+  }
+
+  // Stay in passing phase
+  return {
+    ...newGameState,
+    currentPlayerIndex: undefined,
+    trickLeaderIndex: undefined,
+    currentTrick: [],
+    lastCompletedTrick: undefined,
+    lastTrickWinnerIndex: undefined,
+    heartsBroken: false,
+  };
 }
