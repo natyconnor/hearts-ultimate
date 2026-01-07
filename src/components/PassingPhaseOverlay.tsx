@@ -8,6 +8,10 @@ import {
   getPassTargetIndex,
   isCardSelected,
 } from "../game/passingLogic";
+import {
+  calculateCardHandLayout,
+  calculateCardPosition,
+} from "../game/cardDisplay";
 
 interface PassingPhaseOverlayProps {
   players: Player[];
@@ -41,8 +45,12 @@ export function PassingPhaseOverlay({
   const targetPlayer = players[targetPlayerIndex];
 
   const cardCount = hand.length;
-  const maxRotation = Math.min(20, cardCount * 1.5);
-  const cardSpacing = Math.min(55, 650 / cardCount);
+  const layoutConfig = calculateCardHandLayout(cardCount, {
+    maxRotationMultiplier: 1.5,
+    maxRotationCap: 20,
+    spacingDivisor: 650,
+    maxSpacing: 55,
+  });
 
   return (
     <motion.div
@@ -112,19 +120,17 @@ export function PassingPhaseOverlay({
             className="relative flex items-end justify-center mb-8"
             style={{
               height: "clamp(200px, 20vh, 260px)",
-              width: `${Math.max(600, cardCount * cardSpacing + 150)}px`,
+              width: `${Math.max(600, layoutConfig.totalWidth + 150)}px`,
               maxWidth: "95vw",
             }}
           >
             {hand.map((card, index) => {
-              const centerIndex = (cardCount - 1) / 2;
-              const offsetFromCenter = index - centerIndex;
-              const rotation =
-                centerIndex > 0
-                  ? (offsetFromCenter / centerIndex) * maxRotation
-                  : 0;
-              const xOffset = offsetFromCenter * cardSpacing;
-              const yOffset = Math.abs(offsetFromCenter) * 3;
+              const position = calculateCardPosition(
+                index,
+                cardCount,
+                layoutConfig,
+                { yOffsetMultiplier: 3 }
+              );
 
               const isSelected = isCardSelected(card, selectedCards);
               const canSelect = selectedCards.length < 3 || isSelected;
@@ -140,9 +146,9 @@ export function PassingPhaseOverlay({
                       : "cursor-not-allowed opacity-60"
                   )}
                   style={{
-                    left: `calc(50% + ${xOffset}px)`,
-                    bottom: `${yOffset}px`,
-                    transform: `translateX(-50%) rotate(${rotation}deg)`,
+                    left: `calc(50% + ${position.xOffset}px)`,
+                    bottom: `${position.yOffset}px`,
+                    transform: `translateX(-50%) rotate(${position.rotation}deg)`,
                     transformOrigin: "center bottom",
                     zIndex: index, // Maintain natural layering order
                   }}

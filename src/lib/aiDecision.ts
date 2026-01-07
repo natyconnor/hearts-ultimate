@@ -14,10 +14,6 @@ import {
  * @returns Array of 3 cards to pass
  */
 export function chooseAICardsToPass(hand: Card[]): Card[] {
-  if (hand.length < 3) {
-    return hand.slice(0, 3); // Shouldn't happen, but safety
-  }
-
   // Score each card based on how much we want to get rid of it
   // Higher score = want to pass it more
   const scoredCards = hand.map((card) => {
@@ -60,19 +56,9 @@ export function chooseAICardsToPass(hand: Card[]): Card[] {
  * - If there's a lead suit, play the lowest card of that suit
  * - If leading (no lead suit), pick a random valid suit and play the lowest card of that suit
  */
-export function chooseAICard(
-  gameState: GameState,
-  playerIndex: number
-): Card | null {
+export function chooseAICard(gameState: GameState, playerIndex: number): Card {
   const player = gameState.players[playerIndex];
-  if (!player || !player.isAI) {
-    return null;
-  }
-
   const hand = player.hand;
-  if (hand.length === 0) {
-    return null;
-  }
 
   // Get valid cards the AI can play
   const validCards = getValidCards(
@@ -82,41 +68,34 @@ export function chooseAICard(
     isFirstTrick(gameState)
   );
 
-  if (validCards.length === 0) {
-    // Shouldn't happen, but fallback to first card
-    return hand[0];
-  }
-
   const leadSuit = getLeadSuit(gameState.currentTrick);
 
   // If there's a lead suit, play the lowest card of that suit
   if (leadSuit) {
     const cardsOfLeadSuit = validCards.filter((card) => card.suit === leadSuit);
+    // If we have cards of the lead suit, play the lowest
     if (cardsOfLeadSuit.length > 0) {
-      // Sort by rank ascending and return the lowest
       const sorted = [...cardsOfLeadSuit].sort((a, b) => a.rank - b.rank);
       return sorted[0];
     }
+    // If we don't have the lead suit, we can play any valid card
+    // (rules allow this - if you can't follow suit, you can play anything)
   }
 
-  // No lead suit (AI is leading) - pick a random valid suit and play lowest card
+  // No lead suit (AI is leading) OR couldn't follow suit - pick a random valid suit and play lowest card
   // Group valid cards by suit
   const cardsBySuit = new Map<string, Card[]>();
   validCards.forEach((card) => {
-    const suitCards = cardsBySuit.get(card.suit) || [];
-    suitCards.push(card);
-    cardsBySuit.set(card.suit, suitCards);
+    if (!cardsBySuit.has(card.suit)) {
+      cardsBySuit.set(card.suit, []);
+    }
+    cardsBySuit.get(card.suit)!.push(card);
   });
 
   // Pick a random suit from available suits
   const suits = Array.from(cardsBySuit.keys());
-  if (suits.length === 0) {
-    // Fallback: shouldn't happen, but return first valid card
-    return validCards[0];
-  }
-
   const randomSuit = suits[Math.floor(Math.random() * suits.length)];
-  const cardsOfRandomSuit = cardsBySuit.get(randomSuit) || [];
+  const cardsOfRandomSuit = cardsBySuit.get(randomSuit)!;
 
   // Sort by rank ascending and return the lowest card of the chosen suit
   const sorted = [...cardsOfRandomSuit].sort((a, b) => a.rank - b.rank);

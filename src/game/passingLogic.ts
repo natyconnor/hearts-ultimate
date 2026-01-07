@@ -5,6 +5,7 @@ import type {
   PassSubmission,
 } from "../types/game";
 import { sortHand } from "./deck";
+import { cardsEqual } from "./cardDisplay";
 
 /**
  * Card passing logic for Hearts
@@ -97,9 +98,7 @@ export function validatePassSelection(
 
   // All selected cards must be in hand
   for (const card of selectedCards) {
-    const inHand = hand.some(
-      (c) => c.suit === card.suit && c.rank === card.rank
-    );
+    const inHand = hand.some((c) => cardsEqual(c, card));
     if (!inHand) {
       return { valid: false, reason: "Selected card not in hand" };
     }
@@ -119,9 +118,7 @@ export function validatePassSelection(
  * Checks if a card is in the selection
  */
 export function isCardSelected(card: Card, selectedCards: Card[]): boolean {
-  return selectedCards.some(
-    (c) => c.suit === card.suit && c.rank === card.rank
-  );
+  return selectedCards.some((c) => cardsEqual(c, card));
 }
 
 /**
@@ -221,50 +218,34 @@ export function executePassPhase(gameState: GameState): {
 
   // Create new hands with passed cards removed and received cards added
   const newPlayers = gameState.players.map((player, playerIndex) => {
-    const submission = submissions.find((s) => s.playerId === player.id);
-    if (!submission) {
-      return player; // Shouldn't happen, but safety
-    }
+    const submission = submissions.find((s) => s.playerId === player.id)!;
 
     // Remove the cards this player is passing
     let newHand = player.hand.filter(
       (card) =>
-        !submission.cards.some(
-          (passedCard) =>
-            passedCard.suit === card.suit && passedCard.rank === card.rank
-        )
+        !submission.cards.some((passedCard) => cardsEqual(passedCard, card))
     );
 
     // Find who is passing to this player
     // If we pass left (to index + 1), then we receive from right (index - 1 = index + 3)
     // If we pass right (to index + 3), then we receive from left (index + 1)
     // If we pass across (to index + 2), then we receive from across (index + 2)
-    let receiverOffset: number;
-    switch (direction) {
-      case "left":
-        receiverOffset = 3; // Receive from right (player passing left to us)
-        break;
-      case "right":
-        receiverOffset = 1; // Receive from left (player passing right to us)
-        break;
-      case "across":
-        receiverOffset = 2; // Receive from across
-        break;
-      default:
-        receiverOffset = 0;
-    }
+    const receiverOffset =
+      direction === "left"
+        ? 3 // Receive from right (player passing left to us)
+        : direction === "right"
+        ? 1 // Receive from left (player passing right to us)
+        : 2; // Receive from across
 
     const fromPlayerIndex = (playerIndex + receiverOffset) % 4;
     const fromPlayer = gameState.players[fromPlayerIndex];
     const incomingSubmission = submissions.find(
       (s) => s.playerId === fromPlayer.id
-    );
+    )!;
 
-    if (incomingSubmission) {
-      newHand = [...newHand, ...incomingSubmission.cards];
-      // Track received cards for reveal phase
-      receivedCards[playerIndex] = [...incomingSubmission.cards];
-    }
+    newHand = [...newHand, ...incomingSubmission.cards];
+    // Track received cards for reveal phase
+    receivedCards[playerIndex] = [...incomingSubmission.cards];
 
     // Sort the new hand
     newHand = sortHand(newHand);
@@ -323,4 +304,36 @@ export function processAIPasses(
   }
 
   return currentState;
+}
+
+/**
+ * Processes AI passes and finalizes passing phase if all players have passed.
+ * This is a convenience function that combines processAIPasses, executePassPhase, and finalizePassingPhase.
+ * Note: Calls finalizePassingPhase from gameLogic.ts via the passed callback to avoid circular imports.
+ *
+ * @param gameState - Current game state
+ * @param cardChooser - Function that selects 3 cards to pass from a hand
+ * @param finalizeFn - Function to finalize passing phase (imported from gameLogic)
+ * @returns Updated game state
+ */
+export function processAIPassesAndFinalize(
+  gameState: GameState,
+  cardChooser: (hand: Card[]) => Card[],
+  finalizeFn: (state: GameState) => GameState
+): GameState {
+  if (!gameState.isPassingPhase) return gameState;
+
+  // Process AI passes
+  let updatedState = processAIPasses(gameState, cardChooser);
+
+  // If all players have now passed (e.g., all AI game), finalize
+  if (allPlayersHavePassed(updatedState)) {
+    const executeResult = executePassPhase(updatedState);
+    if (!executeResult.error) {
+      updatedState = executeResult.gameState;
+      updatedState = finalizeFn(updatedState);
+    }
+  }
+
+  return updatedState;
 }

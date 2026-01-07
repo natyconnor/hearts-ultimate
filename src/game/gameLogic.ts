@@ -12,6 +12,7 @@ import {
   isFirstTrick,
 } from "./rules";
 import { getPassDirection } from "./passingLogic";
+import { cardsEqual } from "./cardDisplay";
 
 /**
  * Plays a card and updates the game state
@@ -50,9 +51,7 @@ export function playCard(
   }
 
   // Remove card from hand
-  const updatedHand = player.hand.filter(
-    (c) => !(c.suit === card.suit && c.rank === card.rank)
-  );
+  const updatedHand = player.hand.filter((c) => !cardsEqual(c, card));
 
   // Update player's hand
   const updatedPlayers = [...gameState.players];
@@ -97,27 +96,18 @@ export function playCard(
     const updatedRoundScores = [...gameState.roundScores];
     Object.entries(trickPoints).forEach(([pid, points]) => {
       const pIndex = updatedPlayers.findIndex((p) => p.id === pid);
-      if (pIndex !== -1) {
         updatedRoundScores[pIndex] += points;
-      }
     });
 
     // Check if round is complete
-    const roundComplete = isRoundComplete({
-      ...finalGameState,
-      players: updatedPlayers,
-    });
+    const roundComplete = isRoundComplete(finalGameState);
 
     if (roundComplete) {
       // Check for shooting the moon
       const moonCheck = checkShootingTheMoon(updatedRoundScores);
-      let finalRoundScores = updatedRoundScores;
-      if (moonCheck.shot && moonCheck.playerIndex !== undefined) {
-        finalRoundScores = applyShootingTheMoon(
-          updatedRoundScores,
-          moonCheck.playerIndex
-        );
-      }
+      const finalRoundScores = moonCheck.shot
+        ? applyShootingTheMoon(updatedRoundScores, moonCheck.playerIndex!)
+        : updatedRoundScores;
 
       // Update cumulative scores
       const updatedScores = gameState.scores.map(
@@ -356,11 +346,6 @@ export function resetGameForNewGame(
     isPassingPhase: passDirection !== "none",
     passSubmissions: passDirection !== "none" ? [] : undefined,
   };
-
-  // If no passing this round (shouldn't happen for round 1, but just in case)
-  if (passDirection === "none") {
-    return initializeRound(newGameState);
-  }
 
   // Stay in passing phase
   return {

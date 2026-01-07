@@ -4,6 +4,11 @@ import { Card } from "./Card";
 import type { Card as CardType, Player, GameState } from "../types/game";
 import { cn } from "../lib/utils";
 import { getValidCards, isFirstTrick } from "../game/rules";
+import {
+  getTrickCardPosition,
+  getPlayerStartPosition,
+  getWinnerPosition,
+} from "../game/cardDisplay";
 
 interface GameTableProps {
   players: Player[];
@@ -52,54 +57,6 @@ export function GameTable({
           isFirstTrick(gameState)
         )
       : [];
-
-  // Get card position in the trick circle based on which player played it
-  // Clockwise order: 0=bottom, 1=left, 2=top, 3=right
-  const getCardPositionForPlayer = (playerIndex: number) => {
-    // Position cards in a circle based on player position
-    // Clockwise: 0=bottom (6 o'clock), 1=left (9 o'clock), 2=top (12 o'clock), 3=right (3 o'clock)
-    const radius = 80;
-    const positions = {
-      0: { x: 0, y: radius }, // Bottom player's card at bottom of circle
-      1: { x: -radius, y: 0 }, // Left player's card at left of circle (clockwise from bottom)
-      2: { x: 0, y: -radius }, // Top player's card at top of circle
-      3: { x: radius, y: 0 }, // Right player's card at right of circle
-    };
-    return positions[playerIndex as keyof typeof positions] || { x: 0, y: 0 };
-  };
-
-  // Get starting position for animation (from player's position)
-  const getPlayerStartPosition = (playerIndex: number) => {
-    const positions = {
-      0: { x: 0, y: 250 }, // Bottom - card flies from below
-      1: { x: -250, y: 0 }, // Left - card flies from left (clockwise from bottom)
-      2: { x: 0, y: -250 }, // Top - card flies from above
-      3: { x: 250, y: 0 }, // Right - card flies from right
-    };
-    return positions[playerIndex as keyof typeof positions] || { x: 0, y: 0 };
-  };
-
-  // Get winner's position for animation (where cards should move to)
-  // These values should match the actual player hand positions relative to center
-  // Bottom: bottom-0 left-1/2 → roughly 50% down from center
-  // Top: top-2 left-1/2 → roughly 50% up from center
-  // Left: left-2 top-1/2 → roughly 50% left from center
-  // Right: right-2 top-1/2 → roughly 50% right from center
-  // Using calc based on viewport - the table is full height/width
-  const getWinnerPosition = (playerIndex: number) => {
-    // These need to go all the way to the edge where hands are
-    // Approximate: table height is ~100vh, hands are at edges
-    // From center (50%), bottom hand is at ~95%, top at ~5%
-    // So bottom = +45vh, top = -45vh, left = -45vw, right = +45vw
-    // Converting to approximate pixels for a typical screen:
-    const positions = {
-      0: { x: 0, y: "45vh" }, // Bottom - all the way to bottom player's hand
-      1: { x: "-45vw", y: 0 }, // Left - all the way to left player's hand
-      2: { x: 0, y: "-45vh" }, // Top - all the way to top player's hand
-      3: { x: "45vw", y: 0 }, // Right - all the way to right player's hand
-    };
-    return positions[playerIndex as keyof typeof positions] || { x: 0, y: 0 };
-  };
 
   // Determine which trick to display (current or last completed)
   const displayTrick =
@@ -173,7 +130,7 @@ export function GameTable({
                     gameState?.lastTrickWinnerIndex === trickPlayerIndex;
 
                   // Position card based on which player played it
-                  const cardPos = getCardPositionForPlayer(trickPlayerIndex);
+                  const cardPos = getTrickCardPosition(trickPlayerIndex);
                   const startPos = getPlayerStartPosition(trickPlayerIndex);
 
                   // If animating to winner, calculate final position

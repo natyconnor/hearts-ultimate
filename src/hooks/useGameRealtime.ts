@@ -13,7 +13,11 @@ export function useGameRealtime(slug: string | null): UseGameRealtimeReturn {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const { updateGameState, setError: setStoreError } = useGameStore();
+  const {
+    updateGameState,
+    setError: setStoreError,
+    setCurrentRoom,
+  } = useGameStore();
 
   const unsubscribe = () => {
     if (channelRef.current) {
@@ -51,7 +55,7 @@ export function useGameRealtime(slug: string | null): UseGameRealtimeReturn {
                   | "waiting"
                   | "playing"
                   | "finished";
-                useGameStore.getState().setCurrentRoom({
+                setCurrentRoom({
                   roomId: payload.new.id as string,
                   slug: payload.new.slug as string,
                   status,
@@ -95,7 +99,7 @@ export function useGameRealtime(slug: string | null): UseGameRealtimeReturn {
     return () => {
       unsubscribe();
     };
-  }, [slug, updateGameState, setStoreError]);
+  }, [slug, updateGameState, setStoreError, setCurrentRoom]);
 
   return {
     isConnected,

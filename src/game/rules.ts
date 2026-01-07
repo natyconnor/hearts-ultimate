@@ -1,4 +1,5 @@
 import type { Card, CardSuit, GameState } from "../types/game";
+import { cardsEqual } from "./cardDisplay";
 
 /**
  * Hearts game rules and validation logic
@@ -67,9 +68,7 @@ export function canPlayCard(
   isFirstTrick: boolean
 ): { valid: boolean; reason?: string } {
   // Check if card is in hand
-  const cardInHand = hand.some(
-    (c) => c.suit === card.suit && c.rank === card.rank
-  );
+  const cardInHand = hand.some((c) => cardsEqual(c, card));
   if (!cardInHand) {
     return { valid: false, reason: "Card not in hand" };
   }
@@ -178,9 +177,7 @@ export function calculateTrickPoints(
   const points: Record<string, number> = {};
 
   trick.forEach(({ playerId, card }) => {
-    if (!points[playerId]) {
-      points[playerId] = 0;
-    }
+    points[playerId] = points[playerId] || 0;
 
     if (isHeart(card)) {
       points[playerId] += 1;

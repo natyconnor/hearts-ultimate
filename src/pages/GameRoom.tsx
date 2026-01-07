@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -19,17 +19,18 @@ import {
   prepareNewRound,
   resetGameForNewGame,
   startRoundWithPassingPhase,
-  finalizePassingPhase,
   completeRevealPhase,
+  finalizePassingPhase,
 } from "../game/gameLogic";
 import {
   submitPassSelection,
   executePassPhase,
   allPlayersHavePassed,
   hasPlayerSubmittedPass,
-  processAIPasses,
+  processAIPassesAndFinalize,
 } from "../game/passingLogic";
 import { checkShootingTheMoon } from "../game/rules";
+import { cardsEqual } from "../game/cardDisplay";
 import { GameTable } from "../components/GameTable";
 import { GameEndOverlay } from "../components/GameEndOverlay";
 import { RoundSummaryOverlay } from "../components/RoundSummaryOverlay";
@@ -61,6 +62,10 @@ export function GameRoom() {
     []
   );
   const cardHandRef = useRef<HTMLDivElement>(null);
+  // Use refs for animation state to avoid closure issues in useEffect
+  const isAnimatingRef = useRef(false);
+  const showRoundSummaryRef = useRef(false);
+  const showGameEndRef = useRef(false);
 
   const { isConnected, error: realtimeError } = useGameRealtime(slug ?? null);
 
@@ -89,17 +94,12 @@ export function GameRoom() {
   }, [clearCurrentRoom]);
 
   const currentGameState = gameState ?? room?.gameState ?? null;
-  const players = useMemo(
-    () => currentGameState?.players ?? [],
-    [currentGameState]
-  );
+  const players = currentGameState?.players ?? [];
   const roomStatus = currentRoom.status ?? room?.status ?? "waiting";
 
-  const currentPlayer = useMemo(
-    () =>
-      currentPlayerId ? players.find((p) => p.id === currentPlayerId) : null,
-    [currentPlayerId, players]
-  );
+  const currentPlayer = currentPlayerId
+    ? players.find((p) => p.id === currentPlayerId) ?? null
+    : null;
   const isPlayerInRoom = !!currentPlayer;
 
   useRoomNavigationBlocker({
@@ -217,19 +217,11 @@ export function GameRoom() {
 
       // Process AI passes immediately (they don't need to "think")
       if (updatedGameState.isPassingPhase) {
-        updatedGameState = processAIPasses(
+        updatedGameState = processAIPassesAndFinalize(
           updatedGameState,
-          chooseAICardsToPass
+          chooseAICardsToPass,
+          finalizePassingPhase
         );
-
-        // If all players have now passed (e.g., all AI game), finalize
-        if (allPlayersHavePassed(updatedGameState)) {
-          const executeResult = executePassPhase(updatedGameState);
-          if (!executeResult.error) {
-            updatedGameState = executeResult.gameState;
-            updatedGameState = finalizePassingPhase(updatedGameState);
-          }
-        }
       }
 
       // Update game state with dealt cards, then update status
@@ -302,19 +294,11 @@ export function GameRoom() {
 
       // Process AI passes immediately if in passing phase
       if (updatedGameState.isPassingPhase) {
-        updatedGameState = processAIPasses(
+        updatedGameState = processAIPassesAndFinalize(
           updatedGameState,
-          chooseAICardsToPass
+          chooseAICardsToPass,
+          finalizePassingPhase
         );
-
-        // If all players have now passed (e.g., all AI game), finalize
-        if (allPlayersHavePassed(updatedGameState)) {
-          const executeResult = executePassPhase(updatedGameState);
-          if (!executeResult.error) {
-            updatedGameState = executeResult.gameState;
-            updatedGameState = finalizePassingPhase(updatedGameState);
-          }
-        }
       }
 
       await updateRoomGameState(slug, updatedGameState);
@@ -323,6 +307,7 @@ export function GameRoom() {
     },
     onSuccess: (updatedGameState) => {
       setShowRoundSummary(false);
+      showRoundSummaryRef.current = false;
       setSelectedCardsToPass([]); // Reset pass selection for new round
       updateGameState(updatedGameState);
       queryClient.invalidateQueries({ queryKey: ["room", slug] });
@@ -401,19 +386,11 @@ export function GameRoom() {
 
       // Process AI passes immediately if in passing phase
       if (updatedGameState.isPassingPhase) {
-        updatedGameState = processAIPasses(
+        updatedGameState = processAIPassesAndFinalize(
           updatedGameState,
-          chooseAICardsToPass
+          chooseAICardsToPass,
+          finalizePassingPhase
         );
-
-        // If all players have now passed (e.g., all AI game), finalize
-        if (allPlayersHavePassed(updatedGameState)) {
-          const executeResult = executePassPhase(updatedGameState);
-          if (!executeResult.error) {
-            updatedGameState = executeResult.gameState;
-            updatedGameState = finalizePassingPhase(updatedGameState);
-          }
-        }
       }
 
       // Make sure room status is "playing"
@@ -424,6 +401,7 @@ export function GameRoom() {
     },
     onSuccess: (updatedGameState) => {
       setShowGameEnd(false);
+      showGameEndRef.current = false;
       setSelectedCardsToPass([]); // Reset pass selection for new game
       updateGameState(updatedGameState);
       queryClient.invalidateQueries({ queryKey: ["room", slug] });
@@ -431,30 +409,26 @@ export function GameRoom() {
   });
 
   // Handle toggling a card for passing
-  const handlePassCardToggle = useCallback((card: CardType) => {
+  const handlePassCardToggle = (card: CardType) => {
     setSelectedCardsToPass((prev) => {
-      const isSelected = prev.some(
-        (c) => c.suit === card.suit && c.rank === card.rank
-      );
+      const isSelected = prev.some((c) => cardsEqual(c, card));
       if (isSelected) {
         // Remove the card
-        return prev.filter(
-          (c) => !(c.suit === card.suit && c.rank === card.rank)
-        );
+        return prev.filter((c) => !cardsEqual(c, card));
       } else if (prev.length < 3) {
         // Add the card
         return [...prev, card];
       }
       return prev;
     });
-  }, []);
+  };
 
   // Handle confirming pass selection
-  const handleConfirmPass = useCallback(() => {
+  const handleConfirmPass = () => {
     if (selectedCardsToPass.length === 3) {
       submitPassMutation.mutate(selectedCardsToPass);
     }
-  }, [selectedCardsToPass, submitPassMutation]);
+  };
 
   // Handle going home from game end screen
   const handleGoHome = () => {
@@ -548,81 +522,109 @@ export function GameRoom() {
       return result.gameState;
     },
     onSuccess: (updatedGameState) => {
-      // Check if trick just completed (we have a lastCompletedTrick but empty currentTrick)
-      if (
+      // 1. Update store immediately with mutation result
+      updateGameState(updatedGameState);
+      queryClient.invalidateQueries({ queryKey: ["room", slug] });
+      setSelectedCard(null);
+
+      // 2. Determine if a trick or round just finished
+      const trickJustCompleted =
         updatedGameState.lastCompletedTrick &&
         updatedGameState.lastCompletedTrick.length === 4 &&
-        updatedGameState.currentTrick.length === 0
-      ) {
+        updatedGameState.currentTrick.length === 0;
+
+      if (trickJustCompleted) {
         // Show the completed trick with winner highlight
         setShowCompletedTrick(true);
-        // Start animation to winner after a brief delay
+        setAnimatingToWinner(false);
+        isAnimatingRef.current = true;
+
+        // Sequence: Show trick (600ms) -> Animate to winner (1000ms) -> Show summary
         setTimeout(() => {
           setAnimatingToWinner(true);
-          // Clear trick after animation completes, then check for round/game end
+
           setTimeout(() => {
             setShowCompletedTrick(false);
             setAnimatingToWinner(false);
+            isAnimatingRef.current = false;
 
-            // Check if game ended (someone reached 100+ points)
+            // Final state check - use the mutation result as source of truth
             if (
               updatedGameState.isGameOver &&
               updatedGameState.winnerIndex !== undefined
             ) {
               setShowGameEnd(true);
-            }
-            // Check if round ended (but game continues)
-            else if (updatedGameState.isRoundComplete) {
+              showGameEndRef.current = true;
+            } else if (updatedGameState.isRoundComplete) {
               setShowRoundSummary(true);
+              showRoundSummaryRef.current = true;
             }
           }, 1000);
         }, 600);
       }
-
-      updateGameState(updatedGameState);
-      queryClient.invalidateQueries({ queryKey: ["room", slug] });
-      setSelectedCard(null); // Clear selection after successful play
     },
   });
 
-  // Auto-play for AI players
+  // Auto-play for AI players - watch ONLY currentPlayerIndex (single source of truth)
   useEffect(() => {
-    if (roomStatus !== "playing") return;
-    if (!currentGameState) return;
-    if (currentGameState.isPassingPhase) return; // Don't play during passing phase
-    if (playCardMutation.isPending) return; // Don't trigger if already playing
-    if (showCompletedTrick || animatingToWinner) return; // Wait for animation to complete
-    if (showRoundSummary || showGameEnd) return; // Don't play during overlays
-    if (currentGameState.isRoundComplete || currentGameState.isGameOver) return; // Round/game ended
+    // Don't play if game not active, animations running, or overlays showing
+    if (
+      roomStatus !== "playing" ||
+      !currentGameState ||
+      playCardMutation.isPending ||
+      isAnimatingRef.current ||
+      showRoundSummaryRef.current ||
+      showGameEndRef.current
+    ) {
+      return;
+    }
 
     const currentPlayerIndex = currentGameState.currentPlayerIndex;
     if (currentPlayerIndex === undefined) return;
 
+    // Don't play during passing phase or if round/game ended
+    if (
+      currentGameState.isPassingPhase ||
+      currentGameState.isRoundComplete ||
+      currentGameState.isGameOver
+    ) {
+      return;
+    }
+
     const currentPlayer = currentGameState.players[currentPlayerIndex];
-    if (!currentPlayer || !currentPlayer.isAI) return;
+    if (!currentPlayer.isAI) return;
 
     // Small delay for realism (AI "thinking")
     const timeoutId = setTimeout(() => {
-      const chosenCard = chooseAICard(currentGameState, currentPlayerIndex);
-      if (chosenCard) {
-        playCardMutation.mutate({
-          card: chosenCard,
-          playerId: currentPlayer.id,
-        });
+      // Double-check conditions haven't changed
+      const latestState = gameState ?? room?.gameState;
+      if (
+        !latestState ||
+        latestState.currentPlayerIndex !== currentPlayerIndex ||
+        latestState.players[currentPlayerIndex]?.id !== currentPlayer.id ||
+        playCardMutation.isPending ||
+        isAnimatingRef.current ||
+        showRoundSummaryRef.current ||
+        showGameEndRef.current
+      ) {
+        return;
       }
-    }, 800); // 800ms delay for AI "thinking"
+
+      const chosenCard = chooseAICard(latestState, currentPlayerIndex);
+      playCardMutation.mutate({
+        card: chosenCard,
+        playerId: currentPlayer.id,
+      });
+    }, 800);
 
     return () => clearTimeout(timeoutId);
   }, [
     currentGameState?.currentPlayerIndex,
-    currentGameState?.currentTrick.length,
-    currentGameState?.isRoundComplete,
-    currentGameState?.isGameOver,
-    currentGameState?.isPassingPhase,
-    roomStatus,
-    playCardMutation.isPending,
-    playCardMutation,
     currentGameState,
+    roomStatus,
+    playCardMutation,
+    gameState,
+    room,
     showCompletedTrick,
     animatingToWinner,
     showRoundSummary,

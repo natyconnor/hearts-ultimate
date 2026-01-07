@@ -2,6 +2,11 @@ import { motion } from "framer-motion";
 import { Card } from "./Card";
 import type { Card as CardType } from "../types/game";
 import { cn } from "../lib/utils";
+import {
+  calculateCardHandLayout,
+  calculateCardPosition,
+  cardsEqual,
+} from "../game/cardDisplay";
 
 interface CardHandProps {
   cards: CardType[];
@@ -25,38 +30,22 @@ export function CardHand({
   }
 
   const cardCount = cards.length;
-
-  // Adjust spread based on card count
-  const maxRotation = Math.min(25, cardCount * 2);
-  const cardSpacing = Math.min(60, 700 / cardCount);
-  const totalWidth = cardCount * cardSpacing;
+  const layoutConfig = calculateCardHandLayout(cardCount);
 
   return (
     <div
       className={cn("relative flex items-end justify-center", className)}
       style={{
         height: "clamp(180px, 15vh, 220px)",
-        width: `${Math.max(500, totalWidth + 100)}px`,
+        width: `${Math.max(500, layoutConfig.totalWidth + 100)}px`,
         maxWidth: "95vw",
       }}
     >
       {cards.map((card, index) => {
-        // Calculate position from center
-        const centerIndex = (cardCount - 1) / 2;
-        const offsetFromCenter = index - centerIndex;
-
-        // Rotation: cards fan out from center
-        const rotation =
-          centerIndex > 0 ? (offsetFromCenter / centerIndex) * maxRotation : 0;
-
-        // Horizontal offset from center
-        const xOffset = offsetFromCenter * cardSpacing;
-
-        // Vertical offset: cards at edges are slightly lower (arc effect)
-        const yOffset = Math.abs(offsetFromCenter) * 4;
+        const position = calculateCardPosition(index, cardCount, layoutConfig);
 
         const isValid = validCards
-          ? validCards.some((c) => c.suit === card.suit && c.rank === card.rank)
+          ? validCards.some((c) => cardsEqual(c, card))
           : true;
         const canClick = onCardClick && isValid && !isFlipped;
 
@@ -67,17 +56,14 @@ export function CardHand({
             className={cn(
               "absolute transition-all duration-100 ease-out",
               canClick &&
-                !(
-                  selectedCard?.suit === card.suit &&
-                  selectedCard?.rank === card.rank
-                ) &&
+                !(selectedCard && cardsEqual(selectedCard, card)) &&
                 "hover:scale-110 hover:-translate-y-8 hover:z-[100] cursor-pointer",
               !isValid && onCardClick && "opacity-50 cursor-not-allowed"
             )}
             style={{
-              left: `calc(50% + ${xOffset}px)`,
-              bottom: `${yOffset}px`,
-              transform: `translateX(-50%) rotate(${rotation}deg)`,
+              left: `calc(50% + ${position.xOffset}px)`,
+              bottom: `${position.yOffset}px`,
+              transform: `translateX(-50%) rotate(${position.rotation}deg)`,
               transformOrigin: "center bottom",
               zIndex: index,
             }}
@@ -89,7 +75,7 @@ export function CardHand({
             animate={{
               opacity: 1,
               y: 0,
-              rotate: rotation,
+              rotate: position.rotation,
             }}
             transition={{
               layout: {
@@ -114,8 +100,7 @@ export function CardHand({
           >
             <motion.div
               animate={
-                selectedCard?.suit === card.suit &&
-                selectedCard?.rank === card.rank
+                selectedCard && cardsEqual(selectedCard, card)
                   ? {
                       scale: 1.1,
                       y: -16,
@@ -135,8 +120,7 @@ export function CardHand({
                 rank={card.rank}
                 isFlipped={isFlipped}
                 isSelected={
-                  selectedCard?.suit === card.suit &&
-                  selectedCard?.rank === card.rank
+                  selectedCard ? cardsEqual(selectedCard, card) : false
                 }
                 onClick={
                   canClick ? () => onCardClick?.(card, index) : undefined
