@@ -99,7 +99,7 @@ describe("rules - suit operations", () => {
 describe("rules - canPlayCard", () => {
   it("validates 2 of clubs must lead first trick", () => {
     const hand = [card("clubs", 2), card("clubs", 5)];
-    const trick: typeof GameState.prototype.currentTrick = [];
+    const trick: GameState["currentTrick"] = [];
 
     const result = canPlayCard(card("clubs", 2), hand, trick, false, true);
     expect(result.valid).toBe(true);
@@ -157,7 +157,7 @@ describe("rules - canPlayCard", () => {
 
   it("prevents leading hearts before hearts broken", () => {
     const hand = [card("hearts", 7), card("clubs", 5)];
-    const trick: typeof GameState.prototype.currentTrick = [];
+    const trick: GameState["currentTrick"] = [];
 
     const result = canPlayCard(card("hearts", 7), hand, trick, false, false);
     expect(result.valid).toBe(false);
@@ -166,7 +166,7 @@ describe("rules - canPlayCard", () => {
 
   it("allows leading hearts if only hearts remain", () => {
     const hand = [card("hearts", 7), card("hearts", 10)];
-    const trick: typeof GameState.prototype.currentTrick = [];
+    const trick: GameState["currentTrick"] = [];
 
     const result = canPlayCard(card("hearts", 7), hand, trick, false, false);
     expect(result.valid).toBe(true);
@@ -174,7 +174,7 @@ describe("rules - canPlayCard", () => {
 
   it("allows leading hearts after hearts broken", () => {
     const hand = [card("hearts", 7), card("clubs", 5)];
-    const trick: typeof GameState.prototype.currentTrick = [];
+    const trick: GameState["currentTrick"] = [];
 
     const result = canPlayCard(card("hearts", 7), hand, trick, true, false);
     expect(result.valid).toBe(true);
@@ -189,7 +189,7 @@ describe("rules - getValidCards", () => {
       card("hearts", 7),
       card("spades", 10),
     ];
-    const trick: typeof GameState.prototype.currentTrick = [];
+    const trick: GameState["currentTrick"] = [];
 
     // First trick, must start with 2 of clubs
     const valid = getValidCards(hand, trick, false, true);
