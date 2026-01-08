@@ -124,7 +124,12 @@ export function ReceivedCardsOverlay({
               <Card
                 suit={card.suit}
                 rank={card.rank}
-                className="w-20 h-28 md:w-24 md:h-34 shadow-2xl ring-4 ring-amber-400/80 ring-offset-2 ring-offset-transparent"
+                className={cn(
+                  // Sizing
+                  "w-20 h-28 md:w-24 md:h-34",
+                  // Visual effects
+                  "shadow-2xl ring-4 ring-amber-400/80 ring-offset-2 ring-offset-transparent"
+                )}
               />
             </motion.div>
           ))}
@@ -225,7 +230,18 @@ export function ReceivedCardsOverlay({
             whileTap={{ scale: 0.95 }}
             onClick={onReady}
             disabled={isLoading}
-            className="px-10 py-4 rounded-xl font-semibold text-lg bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg hover:shadow-xl hover:shadow-green-500/30 transition-all disabled:opacity-50 cursor-pointer"
+            className={cn(
+              // Layout & spacing
+              "px-10 py-4 rounded-xl",
+              // Typography
+              "font-semibold text-lg text-white",
+              // Visual styling
+              "bg-gradient-to-r from-green-500 to-emerald-600",
+              "shadow-lg hover:shadow-xl hover:shadow-green-500/30",
+              // Interactions
+              "transition-all cursor-pointer",
+              "disabled:opacity-50"
+            )}
           >
             {isLoading ? (
               <span className="flex items-center gap-2">

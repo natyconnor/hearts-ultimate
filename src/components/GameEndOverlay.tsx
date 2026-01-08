@@ -1,6 +1,12 @@
 import { motion } from "framer-motion";
 import { Trophy, Home, RotateCcw } from "lucide-react";
 import type { Player } from "../types/game";
+import { cn } from "../lib/utils";
+import {
+  buttonClasses,
+  getRankBadgeClasses,
+  getRankRowClasses,
+} from "../lib/styles";
 
 interface GameEndOverlayProps {
   players: Player[];
@@ -111,28 +117,10 @@ export function GameEndOverlay({
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.6 + rank * 0.1 }}
-                  className={`flex items-center justify-between p-3 rounded-xl transition-all ${
-                    rank === 0
-                      ? "bg-gradient-to-r from-yellow-500/30 to-yellow-600/20 border border-yellow-500/40"
-                      : rank === 1
-                      ? "bg-gradient-to-r from-gray-400/20 to-gray-500/10 border border-gray-400/30"
-                      : rank === 2
-                      ? "bg-gradient-to-r from-amber-700/20 to-amber-800/10 border border-amber-700/30"
-                      : "bg-white/5 border border-white/10"
-                  }`}
+                  className={getRankRowClasses(rank)}
                 >
                   <div className="flex items-center gap-3">
-                    <span
-                      className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                        rank === 0
-                          ? "bg-yellow-500 text-yellow-900"
-                          : rank === 1
-                          ? "bg-gray-400 text-gray-800"
-                          : rank === 2
-                          ? "bg-amber-700 text-amber-100"
-                          : "bg-white/20 text-white"
-                      }`}
-                    >
+                    <span className={getRankBadgeClasses(rank)}>
                       {rank + 1}
                     </span>
                     <span className="font-medium text-white">
@@ -143,9 +131,10 @@ export function GameEndOverlay({
                     </span>
                   </div>
                   <span
-                    className={`font-bold text-lg ${
+                    className={cn(
+                      "font-bold text-lg",
                       rank === 0 ? "text-yellow-300" : "text-white/80"
-                    }`}
+                    )}
                   >
                     {item.score} pts
                   </span>
@@ -166,7 +155,7 @@ export function GameEndOverlay({
               disabled={isLoading}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-white/20 cursor-pointer"
+              className={cn(buttonClasses("secondary"), "flex-1")}
             >
               <Home className="w-5 h-5" />
               Home
@@ -176,7 +165,7 @@ export function GameEndOverlay({
               disabled={isLoading}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-green-900/30 cursor-pointer"
+              className={cn(buttonClasses("primary"), "flex-1")}
             >
               <RotateCcw className="w-5 h-5" />
               {isLoading ? "Starting..." : "New Game"}
@@ -210,14 +199,15 @@ export function GameEndOverlay({
                 delay: 0.2 + i * 0.05,
                 ease: "easeOut",
               }}
-              className={`absolute w-3 h-3 rounded-full ${
+              className={cn(
+                "absolute w-3 h-3 rounded-full",
                 [
                   "bg-yellow-400",
                   "bg-amber-400",
                   "bg-orange-400",
                   "bg-red-400",
                 ][i % 4]
-              }`}
+              )}
               style={{
                 left: 0,
                 top: 0,

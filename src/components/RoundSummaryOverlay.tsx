@@ -2,6 +2,8 @@ import { motion } from "framer-motion";
 import { ChevronRight, Moon, Heart } from "lucide-react";
 import type { Player, Card } from "../types/game";
 import { Card as CardComponent } from "./Card";
+import { cn } from "../lib/utils";
+import { getScoreColor, getProgressBarColor, buttonClasses } from "../lib/styles";
 
 interface RoundSummaryOverlayProps {
   players: Player[];
@@ -109,9 +111,14 @@ export function RoundSummaryOverlay({
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.3 + index * 0.08 }}
-                  className={`grid grid-cols-3 gap-2 px-4 py-3 border-b border-white/5 last:border-b-0 ${
-                    isWorst ? "bg-red-500/10" : isBest ? "bg-green-500/10" : ""
-                  }`}
+                  className={cn(
+                    // Layout & spacing
+                    "grid grid-cols-3 gap-2 px-4 py-3",
+                    "border-b border-white/5 last:border-b-0",
+                    // Conditional background
+                    isWorst && "bg-red-500/10",
+                    isBest && "bg-green-500/10"
+                  )}
                 >
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-white truncate">
@@ -122,28 +129,12 @@ export function RoundSummaryOverlay({
                     )}
                   </div>
                   <div className="text-center">
-                    <span
-                      className={`font-bold ${
-                        roundScore === 0
-                          ? "text-green-400"
-                          : roundScore >= 13
-                          ? "text-red-400"
-                          : "text-white"
-                      }`}
-                    >
+                    <span className={cn("font-bold", getScoreColor(roundScore, "round"))}>
                       {roundScore > 0 ? `+${roundScore}` : roundScore}
                     </span>
                   </div>
                   <div className="text-right">
-                    <span
-                      className={`font-bold ${
-                        totalScore >= 80
-                          ? "text-red-400"
-                          : totalScore >= 50
-                          ? "text-yellow-400"
-                          : "text-white"
-                      }`}
-                    >
+                    <span className={cn("font-bold", getScoreColor(totalScore, "total"))}>
                       {totalScore}
                     </span>
                   </div>
@@ -233,13 +224,7 @@ export function RoundSummaryOverlay({
                   )}%`,
                 }}
                 transition={{ delay: 0.6, duration: 0.5 }}
-                className={`h-full rounded-full ${
-                  Math.max(...totalScores) >= 80
-                    ? "bg-gradient-to-r from-red-500 to-red-400"
-                    : Math.max(...totalScores) >= 50
-                    ? "bg-gradient-to-r from-yellow-500 to-yellow-400"
-                    : "bg-gradient-to-r from-green-500 to-green-400"
-                }`}
+                className={getProgressBarColor(Math.max(...totalScores))}
               />
             </div>
             <div className="flex justify-between text-xs mt-1">
@@ -261,7 +246,7 @@ export function RoundSummaryOverlay({
             whileTap={{ scale: 0.98 }}
             onClick={onNextRound}
             disabled={isLoading}
-            className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-900/30 cursor-pointer"
+            className={cn(buttonClasses("blue"), "w-full py-4")}
           >
             {isLoading ? (
               "Dealing cards..."

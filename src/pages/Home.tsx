@@ -7,6 +7,7 @@ import { STORAGE_KEYS } from "../lib/constants";
 import { generateSlug } from "../lib/slugGenerator";
 import { createRoom } from "../lib/roomApi";
 import { Heart, Sparkles, Users, Zap } from "lucide-react";
+import { cn } from "../lib/utils";
 
 // Floating card component for background decoration
 function FloatingCard({
@@ -55,12 +56,17 @@ function FloatingCard({
         style={{ rotate: rotation }}
       >
         <div
-          className={`
-          w-16 h-24 md:w-20 md:h-28 bg-white/10 backdrop-blur-sm rounded-xl
-          flex items-center justify-center text-3xl md:text-4xl font-bold
-          border border-white/20 shadow-xl
-          ${isRed ? "text-red-400" : "text-white/80"}
-        `}
+          className={cn(
+            // Layout & sizing
+            "w-16 h-24 md:w-20 md:h-28",
+            "flex items-center justify-center",
+            // Visual styling
+            "bg-white/10 backdrop-blur-sm rounded-xl",
+            "border border-white/20 shadow-xl",
+            "text-3xl md:text-4xl font-bold",
+            // Conditional color
+            isRed ? "text-red-400" : "text-white/80"
+          )}
         >
           {suit}
         </div>
@@ -291,15 +297,20 @@ export function Home() {
             onMouseLeave={() => setIsHovered(false)}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className={`
-              relative group px-10 py-4 rounded-2xl font-bold text-lg
-              bg-gradient-to-r from-emerald-600 to-emerald-500
-              text-white shadow-2xl shadow-emerald-900/50
-              hover:from-emerald-500 hover:to-emerald-400
-              disabled:opacity-50 disabled:cursor-not-allowed
-              transition-all duration-300 cursor-pointer
-              border border-emerald-400/30
-            `}
+            className={cn(
+              // Layout & positioning
+              "relative group px-10 py-4",
+              // Typography
+              "font-bold text-lg text-white",
+              // Visual styling
+              "bg-gradient-to-r from-emerald-600 to-emerald-500",
+              "hover:from-emerald-500 hover:to-emerald-400",
+              "rounded-2xl border border-emerald-400/30",
+              "shadow-2xl shadow-emerald-900/50",
+              // Interactions
+              "transition-all duration-300 cursor-pointer",
+              "disabled:opacity-50 disabled:cursor-not-allowed"
+            )}
           >
             {/* Button glow effect */}
             <motion.div

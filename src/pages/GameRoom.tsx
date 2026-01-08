@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence } from "framer-motion";
 import { Home } from "lucide-react";
+import { cn } from "../lib/utils";
 import {
   getRoomBySlug,
   updateRoomGameState,
@@ -914,13 +915,14 @@ export function GameRoom() {
               return (
                 <div
                   key={index}
-                  className={`p-4 rounded-lg border-2 ${
-                    isCurrentPlayer
-                      ? "border-poker-green bg-green-50"
-                      : player
-                      ? "border-gray-200 bg-gray-50"
-                      : "border-dashed border-gray-300 bg-gray-100"
-                  }`}
+                  className={cn(
+                    // Base styles
+                    "p-4 rounded-lg border-2",
+                    // Conditional styles
+                    isCurrentPlayer && "border-poker-green bg-green-50",
+                    !isCurrentPlayer && player && "border-gray-200 bg-gray-50",
+                    !player && "border-dashed border-gray-300 bg-gray-100"
+                  )}
                 >
                   {player ? (
                     <div className="flex items-center justify-between">
