@@ -8,10 +8,14 @@ export interface Card {
   rank: CardRank;
 }
 
+// AI difficulty levels
+export type AIDifficulty = "easy" | "medium" | "hard";
+
 export interface Player {
   id: string;
   name: string;
   isAI: boolean;
+  difficulty?: AIDifficulty; // Only for AI players
   hand: Card[];
   score: number;
 }

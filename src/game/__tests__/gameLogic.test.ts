@@ -113,14 +113,23 @@ describe("gameLogic - playCard", () => {
       { playerId: "p3", card: card("spades", 12) }, // 13 points (Q♠)
     ];
     state.players[3].hand = [card("hearts", 10)];
+    state.hands[3] = [card("hearts", 10)];
+    // Ensure other players have cards (not round complete)
+    state.players[0].hand = [card("clubs", 5)];
+    state.players[1].hand = [card("clubs", 6)];
+    state.players[2].hand = [card("clubs", 7)];
+    state.hands[0] = [card("clubs", 5)];
+    state.hands[1] = [card("clubs", 6)];
+    state.hands[2] = [card("clubs", 7)];
 
     const result = playCard(state, "p4", card("hearts", 10));
 
+    // All points go to the trick winner (p4 with hearts 10, highest heart)
     // Hearts (1+1+1) + Queen of Spades (13) = 16 points total
-    expect(result.gameState.roundScores[0]).toBe(1);
-    expect(result.gameState.roundScores[1]).toBe(1);
-    expect(result.gameState.roundScores[2]).toBe(13);
-    expect(result.gameState.roundScores[3]).toBe(1);
+    expect(result.gameState.roundScores[0]).toBe(0);
+    expect(result.gameState.roundScores[1]).toBe(0);
+    expect(result.gameState.roundScores[2]).toBe(0);
+    expect(result.gameState.roundScores[3]).toBe(16);
   });
 
   it("detects round complete and updates total scores", () => {

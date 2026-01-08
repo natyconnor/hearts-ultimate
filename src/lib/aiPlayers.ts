@@ -1,4 +1,4 @@
-import type { Player } from "../types/game";
+import type { Player, AIDifficulty } from "../types/game";
 
 /**
  * Predefined AI player names
@@ -15,13 +15,17 @@ function generateAIPlayerId(): string {
 }
 
 /**
- * Creates an AI player with the given name
+ * Creates an AI player with the given name and difficulty
  */
-export function createAIPlayer(name: string): Player {
+export function createAIPlayer(
+  name: string,
+  difficulty: AIDifficulty = "easy"
+): Player {
   return {
     id: generateAIPlayerId(),
     name,
     isAI: true,
+    difficulty,
     hand: [],
     score: 0,
   };
@@ -55,7 +59,8 @@ export function getNextAIName(existingPlayers: Player[]): string {
  * Returns array of new AI players to add
  */
 export function createAIPlayersToFillSlots(
-  existingPlayers: Player[]
+  existingPlayers: Player[],
+  difficulty: AIDifficulty = "easy"
 ): Player[] {
   const slotsToFill = 4 - existingPlayers.length;
   if (slotsToFill <= 0) {
@@ -65,8 +70,40 @@ export function createAIPlayersToFillSlots(
   const newAIPlayers: Player[] = [];
   for (let i = 0; i < slotsToFill; i++) {
     const name = getNextAIName([...existingPlayers, ...newAIPlayers]);
-    newAIPlayers.push(createAIPlayer(name));
+    newAIPlayers.push(createAIPlayer(name, difficulty));
   }
 
   return newAIPlayers;
+}
+
+/**
+ * Get display name for a difficulty level
+ */
+export function getDifficultyDisplayName(difficulty: AIDifficulty): string {
+  switch (difficulty) {
+    case "easy":
+      return "Easy";
+    case "medium":
+      return "Medium";
+    case "hard":
+      return "Hard";
+    default:
+      return "Easy";
+  }
+}
+
+/**
+ * Get description for a difficulty level
+ */
+export function getDifficultyDescription(difficulty: AIDifficulty): string {
+  switch (difficulty) {
+    case "easy":
+      return "Simple AI that plays basic cards";
+    case "medium":
+      return "Strategic AI that avoids penalties";
+    case "hard":
+      return "Expert AI with card counting and bluffing";
+    default:
+      return "";
+  }
 }

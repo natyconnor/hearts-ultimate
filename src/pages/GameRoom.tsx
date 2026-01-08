@@ -16,7 +16,7 @@ import { usePageUnloadWarning } from "../hooks/usePageUnloadWarning";
 import { useGameStore } from "../store/gameStore";
 import { STORAGE_KEYS } from "../lib/constants";
 import { createAIPlayersToFillSlots } from "../lib/aiPlayers";
-import { chooseAICard, chooseAICardsToPass } from "../lib/aiDecision";
+import { chooseAICard, chooseAICardsToPass } from "../lib/ai";
 import { createAndDeal } from "../game/deck";
 import {
   prepareNewRound,
@@ -39,8 +39,14 @@ import { GameEndOverlay } from "../components/GameEndOverlay";
 import { RoundSummaryOverlay } from "../components/RoundSummaryOverlay";
 import { PassingPhaseOverlay } from "../components/PassingPhaseOverlay";
 import { ReceivedCardsOverlay } from "../components/ReceivedCardsOverlay";
+import { AIDebugOverlay } from "../components/AIDebugOverlay";
 import { playSound } from "../lib/sounds";
-import type { GameState, Player, Card as CardType } from "../types/game";
+import type {
+  GameState,
+  Player,
+  Card as CardType,
+  AIDifficulty,
+} from "../types/game";
 
 export function GameRoom() {
   const { slug } = useParams<{ slug: string }>();
@@ -177,7 +183,16 @@ export function GameRoom() {
       if (currentGameState.players.length >= 4)
         throw new Error("Room is already full");
 
-      const newAIPlayers = createAIPlayersToFillSlots(currentGameState.players);
+      // Get AI difficulty from localStorage
+      const storedDifficulty = localStorage.getItem(
+        STORAGE_KEYS.AI_DIFFICULTY
+      ) as AIDifficulty | null;
+      const difficulty: AIDifficulty = storedDifficulty || "easy";
+
+      const newAIPlayers = createAIPlayersToFillSlots(
+        currentGameState.players,
+        difficulty
+      );
       const updatedGameState: GameState = {
         ...currentGameState,
         players: [...currentGameState.players, ...newAIPlayers],
@@ -875,6 +890,7 @@ export function GameRoom() {
               );
             })()}
         </AnimatePresence>
+        <AIDebugOverlay />
       </div>
     );
   }

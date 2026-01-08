@@ -1,4 +1,4 @@
-import type { Card } from "../types/game";
+import type { Card, CardRank } from "../types/game";
 
 /**
  * Calculates card hand layout properties for fanning cards
@@ -72,6 +72,47 @@ export function calculateCardPosition(
  */
 export function cardsEqual(card1: Card, card2: Card): boolean {
   return card1.suit === card2.suit && card1.rank === card2.rank;
+}
+
+/**
+ * Formats a card rank to string (e.g. 11 -> "J", 14 -> "A")
+ */
+export function formatRank(rank: CardRank): string {
+  switch (rank) {
+    case 11:
+      return "J";
+    case 12:
+      return "Q";
+    case 13:
+      return "K";
+    case 14:
+      return "A";
+    default:
+      return rank.toString();
+  }
+}
+
+/**
+ * Formats a card suit to emoji
+ */
+export function formatSuit(suit: Card["suit"]): string {
+  switch (suit) {
+    case "hearts":
+      return "♥";
+    case "diamonds":
+      return "♦";
+    case "clubs":
+      return "♣";
+    case "spades":
+      return "♠";
+  }
+}
+
+/**
+ * Formats a card as a string (e.g. "K♠", "10♥")
+ */
+export function formatCard(card: Card): string {
+  return `${formatRank(card.rank)}${formatSuit(card.suit)}`;
 }
 
 /**

@@ -1,6 +1,7 @@
 export const STORAGE_KEYS = {
   PLAYER_ID: "hearts-player-id",
   PLAYER_NAME: "hearts-player-name",
+  AI_DIFFICULTY: "hearts-ai-difficulty",
 } as const;
 
 export const GAME_CONFIG = {

@@ -1,13 +1,14 @@
 import { useEffect, useState, useMemo } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useGameStore } from "../store/gameStore";
 import { STORAGE_KEYS } from "../lib/constants";
 import { generateSlug } from "../lib/slugGenerator";
 import { createRoom } from "../lib/roomApi";
-import { Heart, Sparkles, Users, Zap } from "lucide-react";
+import { Heart, Sparkles, Users, Zap, Brain, ChevronDown } from "lucide-react";
 import { cn } from "../lib/utils";
+import type { AIDifficulty } from "../types/game";
 
 // Floating card component for background decoration
 function FloatingCard({
@@ -75,11 +76,44 @@ function FloatingCard({
   );
 }
 
+const DIFFICULTY_OPTIONS: {
+  value: AIDifficulty;
+  label: string;
+  description: string;
+  icon: string;
+}[] = [
+  {
+    value: "easy",
+    label: "Easy",
+    description: "Simple AI that plays basic cards",
+    icon: "🌱",
+  },
+  {
+    value: "medium",
+    label: "Medium",
+    description: "Strategic AI that avoids penalties",
+    icon: "⚡",
+  },
+  {
+    value: "hard",
+    label: "Hard",
+    description: "Expert AI with card counting",
+    icon: "🧠",
+  },
+];
+
 export function Home() {
   const navigate = useNavigate();
   const { clearCurrentRoom, setCurrentRoom, setLoading, setError } =
     useGameStore();
   const [isHovered, setIsHovered] = useState(false);
+  const [selectedDifficulty, setSelectedDifficulty] = useState<AIDifficulty>(
+    () => {
+      const stored = localStorage.getItem(STORAGE_KEYS.AI_DIFFICULTY);
+      return (stored as AIDifficulty) || "easy";
+    }
+  );
+  const [showDifficultyMenu, setShowDifficultyMenu] = useState(false);
 
   useEffect(() => {
     const storedPlayerId = localStorage.getItem(STORAGE_KEYS.PLAYER_ID);
@@ -87,6 +121,11 @@ export function Home() {
       clearCurrentRoom();
     }
   }, [clearCurrentRoom]);
+
+  // Save difficulty to localStorage when changed
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.AI_DIFFICULTY, selectedDifficulty);
+  }, [selectedDifficulty]);
 
   const createRoomMutation = useMutation({
     mutationFn: async (slug: string) => {
@@ -282,6 +321,93 @@ export function Home() {
               </span>
             </motion.div>
           ))}
+        </motion.div>
+
+        {/* Difficulty selector */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.45 }}
+          className="relative mb-6"
+        >
+          <button
+            onClick={() => setShowDifficultyMenu(!showDifficultyMenu)}
+            className={cn(
+              "flex items-center gap-3 px-5 py-3",
+              "bg-white/5 backdrop-blur-sm rounded-xl",
+              "border border-white/10 hover:border-white/20",
+              "transition-all duration-200"
+            )}
+          >
+            <Brain className="w-5 h-5 text-emerald-400" />
+            <span className="text-white/90 font-medium">
+              AI Difficulty:{" "}
+              <span className="text-emerald-400">
+                {DIFFICULTY_OPTIONS.find((d) => d.value === selectedDifficulty)
+                  ?.icon}{" "}
+                {DIFFICULTY_OPTIONS.find((d) => d.value === selectedDifficulty)
+                  ?.label}
+              </span>
+            </span>
+            <ChevronDown
+              className={cn(
+                "w-4 h-4 text-white/60 transition-transform",
+                showDifficultyMenu && "rotate-180"
+              )}
+            />
+          </button>
+
+          {/* Dropdown menu */}
+          <AnimatePresence>
+            {showDifficultyMenu && (
+              <motion.div
+                initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                transition={{ duration: 0.15 }}
+                className={cn(
+                  "absolute top-full left-0 right-0 mt-2 z-50",
+                  "bg-slate-800/95 backdrop-blur-lg rounded-xl",
+                  "border border-white/10 shadow-2xl overflow-hidden"
+                )}
+              >
+                {DIFFICULTY_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => {
+                      setSelectedDifficulty(option.value);
+                      setShowDifficultyMenu(false);
+                    }}
+                    className={cn(
+                      "w-full flex items-start gap-3 px-4 py-3 text-left",
+                      "hover:bg-white/5 transition-colors",
+                      selectedDifficulty === option.value && "bg-emerald-500/10"
+                    )}
+                  >
+                    <span className="text-xl mt-0.5">{option.icon}</span>
+                    <div className="flex-1">
+                      <div
+                        className={cn(
+                          "font-medium",
+                          selectedDifficulty === option.value
+                            ? "text-emerald-400"
+                            : "text-white"
+                        )}
+                      >
+                        {option.label}
+                      </div>
+                      <div className="text-sm text-white/50">
+                        {option.description}
+                      </div>
+                    </div>
+                    {selectedDifficulty === option.value && (
+                      <span className="text-emerald-400 mt-1">✓</span>
+                    )}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
 
         {/* Create Game button */}

@@ -273,6 +273,16 @@ export function executePassPhase(gameState: GameState): {
 }
 
 /**
+ * Card chooser function type for AI passing
+ * Takes hand, game state, and player index, returns 3 cards to pass
+ */
+export type AICardChooser = (
+  hand: Card[],
+  gameState: GameState,
+  playerIndex: number
+) => Card[];
+
+/**
  * Processes all AI player passes in a single call.
  * This is meant to be called imperatively from mutations, not from useEffect.
  *
@@ -282,7 +292,7 @@ export function executePassPhase(gameState: GameState): {
  */
 export function processAIPasses(
   gameState: GameState,
-  cardChooser: (hand: Card[]) => Card[]
+  cardChooser: AICardChooser
 ): GameState {
   if (!gameState.isPassingPhase) return gameState;
   if (gameState.passDirection === "none") return gameState;
@@ -290,11 +300,12 @@ export function processAIPasses(
   let currentState = gameState;
 
   // Process each AI player
-  for (const player of gameState.players) {
+  for (let playerIndex = 0; playerIndex < gameState.players.length; playerIndex++) {
+    const player = gameState.players[playerIndex];
     if (!player.isAI) continue;
     if (hasPlayerSubmittedPass(currentState, player.id)) continue;
 
-    const cardsToPass = cardChooser(player.hand);
+    const cardsToPass = cardChooser(player.hand, currentState, playerIndex);
     if (cardsToPass.length !== 3) continue;
 
     const result = submitPassSelection(currentState, player.id, cardsToPass);
@@ -318,7 +329,7 @@ export function processAIPasses(
  */
 export function processAIPassesAndFinalize(
   gameState: GameState,
-  cardChooser: (hand: Card[]) => Card[],
+  cardChooser: AICardChooser,
   finalizeFn: (state: GameState) => GameState
 ): GameState {
   if (!gameState.isPassingPhase) return gameState;
