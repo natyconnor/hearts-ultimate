@@ -58,7 +58,9 @@ export function CardHand({
               canClick &&
                 !(selectedCard && cardsEqual(selectedCard, card)) &&
                 "hover:scale-110 hover:-translate-y-8 hover:z-[100] cursor-pointer",
-              !isValid && onCardClick && "opacity-50 cursor-not-allowed"
+              !isValid &&
+                onCardClick &&
+                "opacity-30 brightness-75 cursor-not-allowed"
             )}
             style={{
               left: `calc(50% + ${position.xOffset}px)`,

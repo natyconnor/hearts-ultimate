@@ -57,6 +57,7 @@ export function PassingPhaseOverlay({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
+      transition={{ duration: 0.5 }}
       className="fixed inset-0 z-50 flex flex-col items-center justify-center"
     >
       {/* Dark overlay background */}
@@ -267,7 +268,7 @@ export function PassingPhaseOverlay({
               className={cn(
                 "px-8 py-3 rounded-xl font-semibold text-lg transition-all shadow-lg",
                 selectedCards.length === 3
-                  ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:shadow-xl hover:shadow-green-500/30"
+                  ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:shadow-xl hover:shadow-green-500/30 cursor-pointer"
                   : "bg-gray-600 text-gray-400 cursor-not-allowed"
               )}
             >

@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { AnimatePresence } from "framer-motion";
+import { Home } from "lucide-react";
 import {
   getRoomBySlug,
   updateRoomGameState,
@@ -36,6 +38,7 @@ import { GameEndOverlay } from "../components/GameEndOverlay";
 import { RoundSummaryOverlay } from "../components/RoundSummaryOverlay";
 import { PassingPhaseOverlay } from "../components/PassingPhaseOverlay";
 import { ReceivedCardsOverlay } from "../components/ReceivedCardsOverlay";
+import { playSound } from "../lib/sounds";
 import type { GameState, Player, Card as CardType } from "../types/game";
 
 export function GameRoom() {
@@ -527,6 +530,15 @@ export function GameRoom() {
       queryClient.invalidateQueries({ queryKey: ["room", slug] });
       setSelectedCard(null);
 
+      // Play card sound
+      playSound("cardPlay");
+
+      // Check if hearts just broke (compare with previous state)
+      const prevHeartsBroken = currentGameState?.heartsBroken ?? false;
+      if (!prevHeartsBroken && updatedGameState.heartsBroken) {
+        setTimeout(() => playSound("heartsBroken"), 200);
+      }
+
       // 2. Determine if a trick or round just finished
       const trickJustCompleted =
         updatedGameState.lastCompletedTrick &&
@@ -534,6 +546,9 @@ export function GameRoom() {
         updatedGameState.currentTrick.length === 0;
 
       if (trickJustCompleted) {
+        // Play trick win sound
+        setTimeout(() => playSound("trickWin"), 400);
+
         // Show the completed trick with winner highlight
         setShowCompletedTrick(true);
         setAnimatingToWinner(false);
@@ -553,9 +568,17 @@ export function GameRoom() {
               updatedGameState.isGameOver &&
               updatedGameState.winnerIndex !== undefined
             ) {
+              playSound("gameEnd");
               setShowGameEnd(true);
               showGameEndRef.current = true;
             } else if (updatedGameState.isRoundComplete) {
+              // Check for shooting the moon
+              const moonCheck = checkShootingTheMoon(
+                updatedGameState.roundScores
+              );
+              if (moonCheck.shot) {
+                playSound("shootTheMoon");
+              }
               setShowRoundSummary(true);
               showRoundSummaryRef.current = true;
             }
@@ -678,8 +701,9 @@ export function GameRoom() {
               <div className="flex items-center gap-6">
                 <Link
                   to="/"
-                  className="text-white/80 hover:text-white transition-colors font-medium text-sm md:text-base"
+                  className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium text-sm transition-all border border-white/20 hover:border-white/30 cursor-pointer"
                 >
+                  <Home className="w-4 h-4" />
                   Home
                 </Link>
                 <div className="h-6 w-px bg-white/20" />
@@ -742,103 +766,114 @@ export function GameRoom() {
           />
         </div>
 
-        {/* Round Summary Overlay */}
-        {showRoundSummary && currentGameState && (
-          <RoundSummaryOverlay
-            players={players}
-            roundNumber={currentGameState.roundNumber}
-            roundScores={currentGameState.roundScores}
-            totalScores={currentGameState.scores}
-            shotTheMoon={
-              checkShootingTheMoon(currentGameState.roundScores).shot
-                ? {
-                    playerIndex: checkShootingTheMoon(
-                      currentGameState.roundScores
-                    ).playerIndex!,
-                  }
-                : null
-            }
-            onNextRound={() => nextRoundMutation.mutate()}
-            isLoading={nextRoundMutation.isPending}
-          />
-        )}
-
-        {/* Game End Overlay */}
-        {showGameEnd &&
-          currentGameState &&
-          currentGameState.winnerIndex !== undefined && (
-            <GameEndOverlay
+        {/* Overlays with smooth transitions */}
+        <AnimatePresence mode="wait">
+          {/* Round Summary Overlay */}
+          {showRoundSummary && currentGameState && (
+            <RoundSummaryOverlay
+              key="round-summary"
               players={players}
-              scores={currentGameState.scores}
-              winnerIndex={currentGameState.winnerIndex}
-              onNewGame={() => newGameMutation.mutate()}
-              onGoHome={handleGoHome}
-              isLoading={newGameMutation.isPending}
+              roundNumber={currentGameState.roundNumber}
+              roundScores={currentGameState.roundScores}
+              totalScores={currentGameState.scores}
+              shotTheMoon={
+                checkShootingTheMoon(currentGameState.roundScores).shot
+                  ? {
+                      playerIndex: checkShootingTheMoon(
+                        currentGameState.roundScores
+                      ).playerIndex!,
+                    }
+                  : null
+              }
+              pointsCardsTaken={currentGameState.pointsCardsTaken}
+              onNextRound={() => nextRoundMutation.mutate()}
+              isLoading={nextRoundMutation.isPending}
             />
           )}
 
-        {/* Passing Phase Overlay */}
-        {currentGameState?.isPassingPhase &&
-          currentGameState.passDirection &&
-          currentGameState.passDirection !== "none" &&
-          currentPlayerId &&
-          (() => {
-            const playerIndex = players.findIndex(
-              (p) => p.id === currentPlayerId
-            );
-            if (playerIndex === -1) return null;
-
-            const hasSubmitted = hasPlayerSubmittedPass(
-              currentGameState,
-              currentPlayerId
-            );
-            const waitingForPlayers = players
-              .filter(
-                (p) =>
-                  !p.isAI && !hasPlayerSubmittedPass(currentGameState, p.id)
-              )
-              .map((p) => p.name);
-
-            return (
-              <PassingPhaseOverlay
+          {/* Game End Overlay */}
+          {showGameEnd &&
+            currentGameState &&
+            currentGameState.winnerIndex !== undefined && (
+              <GameEndOverlay
+                key="game-end"
                 players={players}
-                currentPlayerIndex={playerIndex}
-                passDirection={currentGameState.passDirection}
-                selectedCards={selectedCardsToPass}
-                onCardToggle={handlePassCardToggle}
-                onConfirmPass={handleConfirmPass}
-                isSubmitting={submitPassMutation.isPending}
-                hasSubmitted={hasSubmitted}
-                waitingForPlayers={waitingForPlayers}
+                scores={currentGameState.scores}
+                winnerIndex={currentGameState.winnerIndex}
+                onNewGame={() => newGameMutation.mutate()}
+                onGoHome={handleGoHome}
+                isLoading={newGameMutation.isPending}
               />
-            );
-          })()}
+            )}
+        </AnimatePresence>
 
-        {/* Reveal Phase Overlay - Shows received cards */}
-        {currentGameState?.isRevealPhase &&
-          currentGameState.passDirection &&
-          currentGameState.receivedCards &&
-          currentPlayerId &&
-          (() => {
-            const playerIndex = players.findIndex(
-              (p) => p.id === currentPlayerId
-            );
-            if (playerIndex === -1) return null;
+        {/* Passing/Receiving Overlays - Crossfade transition */}
+        <AnimatePresence>
+          {/* Passing Phase Overlay */}
+          {currentGameState?.isPassingPhase &&
+            currentGameState.passDirection &&
+            currentGameState.passDirection !== "none" &&
+            currentPlayerId &&
+            (() => {
+              const playerIndex = players.findIndex(
+                (p) => p.id === currentPlayerId
+              );
+              if (playerIndex === -1) return null;
 
-            const receivedCards =
-              currentGameState.receivedCards[playerIndex] || [];
+              const hasSubmitted = hasPlayerSubmittedPass(
+                currentGameState,
+                currentPlayerId
+              );
+              const waitingForPlayers = players
+                .filter(
+                  (p) =>
+                    !p.isAI && !hasPlayerSubmittedPass(currentGameState, p.id)
+                )
+                .map((p) => p.name);
 
-            return (
-              <ReceivedCardsOverlay
-                players={players}
-                currentPlayerIndex={playerIndex}
-                passDirection={currentGameState.passDirection}
-                receivedCards={receivedCards}
-                onReady={() => completeRevealMutation.mutate()}
-                isLoading={completeRevealMutation.isPending}
-              />
-            );
-          })()}
+              return (
+                <PassingPhaseOverlay
+                  key="passing-phase"
+                  players={players}
+                  currentPlayerIndex={playerIndex}
+                  passDirection={currentGameState.passDirection}
+                  selectedCards={selectedCardsToPass}
+                  onCardToggle={handlePassCardToggle}
+                  onConfirmPass={handleConfirmPass}
+                  isSubmitting={submitPassMutation.isPending}
+                  hasSubmitted={hasSubmitted}
+                  waitingForPlayers={waitingForPlayers}
+                />
+              );
+            })()}
+
+          {/* Reveal Phase Overlay - Shows received cards */}
+          {currentGameState?.isRevealPhase &&
+            currentGameState.passDirection &&
+            currentGameState.receivedCards &&
+            currentPlayerId &&
+            (() => {
+              const playerIndex = players.findIndex(
+                (p) => p.id === currentPlayerId
+              );
+              if (playerIndex === -1) return null;
+
+              const receivedCards =
+                currentGameState.receivedCards[playerIndex] || [];
+
+              return (
+                <ReceivedCardsOverlay
+                  key="reveal-phase"
+                  players={players}
+                  currentPlayerIndex={playerIndex}
+                  passDirection={currentGameState.passDirection}
+                  receivedCards={receivedCards}
+                  onReady={() => completeRevealMutation.mutate()}
+                  isLoading={completeRevealMutation.isPending}
+                />
+              );
+            })()}
+        </AnimatePresence>
       </div>
     );
   }

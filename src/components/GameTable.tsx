@@ -1,14 +1,15 @@
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { CardHand } from "./CardHand";
 import { Card } from "./Card";
 import type { Card as CardType, Player, GameState } from "../types/game";
 import { cn } from "../lib/utils";
-import { getValidCards, isFirstTrick } from "../game/rules";
+import { getValidCards, isFirstTrick, isTwoOfClubs } from "../game/rules";
 import {
   getTrickCardPosition,
   getPlayerStartPosition,
   getWinnerPosition,
 } from "../game/cardDisplay";
+import { Heart, Info } from "lucide-react";
 
 interface GameTableProps {
   players: Player[];
@@ -112,9 +113,12 @@ export function GameTable({
                 <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="absolute top-[-120px] left-1/2 transform -translate-x-1/2 bg-green-500/90 text-white text-sm font-bold px-4 py-1.5 rounded-full shadow-lg z-20"
+                  className="absolute top-[-120px] left-1/2 transform -translate-x-1/2 bg-green-500/90 text-white text-sm font-bold px-4 py-1.5 rounded-full shadow-lg z-20 whitespace-nowrap"
                 >
-                  🏆 {players[gameState.lastTrickWinnerIndex]?.name} wins!
+                  🏆{" "}
+                  {gameState.lastTrickWinnerIndex === currentPlayerIndex
+                    ? "You win!"
+                    : `${players[gameState.lastTrickWinnerIndex]?.name} wins!`}
                 </motion.div>
               )}
             <div className="flex flex-col gap-2 items-center justify-center min-w-[280px] min-h-[200px]">
@@ -216,6 +220,83 @@ export function GameTable({
           <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 pb-2 md:pb-4">
             {getPlayerAtPosition(0) && (
               <div className="flex flex-col items-center" ref={cardHandRef}>
+                {/* Badges above player's hand */}
+                <div className="mb-2 flex flex-col items-center gap-1.5 z-30">
+                  {/* Hearts Broken Indicator */}
+                  <AnimatePresence>
+                    {gameState?.heartsBroken && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0, y: -10 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0 }}
+                      >
+                        <motion.div
+                          animate={{
+                            scale: [1, 1.05, 1],
+                          }}
+                          transition={{
+                            duration: 2,
+                            repeat: Infinity,
+                            ease: "easeInOut",
+                          }}
+                          className="flex items-center gap-2 px-3 py-1.5 bg-red-500/20 backdrop-blur-sm rounded-full border border-red-500/40 shadow-lg shadow-red-500/20"
+                        >
+                          <motion.div
+                            animate={{
+                              scale: [1, 1.2, 1],
+                            }}
+                            transition={{
+                              duration: 0.8,
+                              repeat: Infinity,
+                              ease: "easeInOut",
+                            }}
+                          >
+                            <Heart className="w-4 h-4 text-red-500 fill-red-500" />
+                          </motion.div>
+                          <span className="text-red-200 font-semibold text-xs tracking-wide">
+                            Hearts Broken
+                          </span>
+                          <motion.div
+                            animate={{
+                              scale: [1, 1.2, 1],
+                            }}
+                            transition={{
+                              duration: 0.8,
+                              repeat: Infinity,
+                              ease: "easeInOut",
+                              delay: 0.4,
+                            }}
+                          >
+                            <Heart className="w-4 h-4 text-red-500 fill-red-500" />
+                          </motion.div>
+                        </motion.div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* No Pass Round Indicator - First Trick */}
+                  <AnimatePresence>
+                    {gameState &&
+                      gameState.passDirection === "none" &&
+                      isFirstTrick(gameState) && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0, y: -10 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0 }}
+                        >
+                          <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/20 backdrop-blur-sm rounded-full border border-blue-500/40 shadow-lg shadow-blue-500/20">
+                            <Info className="w-4 h-4 text-blue-300" />
+                            <span className="text-blue-200 font-semibold text-xs tracking-wide whitespace-nowrap">
+                              No Pass Round
+                              {getPlayerAtPosition(0)?.hand.some(
+                                isTwoOfClubs
+                              ) && " - Play 2♣ to start"}
+                            </span>
+                          </div>
+                        </motion.div>
+                      )}
+                  </AnimatePresence>
+                </div>
                 <CardHand
                   cards={getPlayerAtPosition(0)?.hand || []}
                   isFlipped={currentPlayerIndex !== 0}

@@ -49,6 +49,11 @@ export interface GameState {
   // Reveal phase fields (after passing, before play)
   isRevealPhase?: boolean; // True when showing received cards
   receivedCards?: Card[][]; // Cards each player received (indexed by player index)
+
+  // Points cards taken during the round (for round summary)
+  // Only contains penalty cards: hearts (1pt each) and Queen of Spades (13pts)
+  // All penalty cards from a trick go to the trick winner
+  pointsCardsTaken?: Card[][]; // Penalty cards taken by each player (indexed by player index)
 }
 
 export interface GameRoom {

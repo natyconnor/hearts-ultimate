@@ -225,7 +225,7 @@ export function ReceivedCardsOverlay({
             whileTap={{ scale: 0.95 }}
             onClick={onReady}
             disabled={isLoading}
-            className="px-10 py-4 rounded-xl font-semibold text-lg bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg hover:shadow-xl hover:shadow-green-500/30 transition-all disabled:opacity-50"
+            className="px-10 py-4 rounded-xl font-semibold text-lg bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg hover:shadow-xl hover:shadow-green-500/30 transition-all disabled:opacity-50 cursor-pointer"
           >
             {isLoading ? (
               <span className="flex items-center gap-2">

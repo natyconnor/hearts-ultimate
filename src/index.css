@@ -91,8 +91,96 @@
   * {
     border-color: var(--border);
   }
-  body {
-    background-color: var(--background);
+
+  html, body, #root {
+    background-color: #0f172a; /* slate-900 - matches game theme */
     color: var(--foreground);
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Global cursor pointer for all interactive elements */
+  button,
+  [role="button"],
+  input[type="submit"],
+  input[type="button"],
+  input[type="reset"],
+  a[href],
+  select {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [role="button"][aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+}
+
+/* Card shine animation */
+@keyframes shine {
+  0% {
+    transform: translateX(-100%) rotate(25deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.5;
+  }
+  40% {
+    opacity: 0;
+    transform: translateX(100%) rotate(25deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(100%) rotate(25deg);
+  }
+}
+
+/* Smooth button press effect */
+@keyframes buttonPress {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.98);
+  }
+}
+
+/* Heartbeat animation for hearts broken */
+@keyframes heartbeat {
+  0%, 100% {
+    transform: scale(1);
+  }
+  15% {
+    transform: scale(1.15);
+  }
+  30% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.1);
+  }
+  60% {
+    transform: scale(1);
+  }
+}
+
+/* Floating animation for decorative elements */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Gradient text animation */
+@keyframes gradientShift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
   }
 }

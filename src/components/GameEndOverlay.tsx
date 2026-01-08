@@ -161,22 +161,26 @@ export function GameEndOverlay({
             transition={{ delay: 0.9 }}
             className="flex gap-4"
           >
-            <button
+            <motion.button
               onClick={onGoHome}
               disabled={isLoading}
-              className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-white/20"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-white/20 cursor-pointer"
             >
               <Home className="w-5 h-5" />
               Home
-            </button>
-            <button
+            </motion.button>
+            <motion.button
               onClick={onNewGame}
               disabled={isLoading}
-              className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-green-900/30"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-green-900/30 cursor-pointer"
             >
               <RotateCcw className="w-5 h-5" />
               {isLoading ? "Starting..." : "New Game"}
-            </button>
+            </motion.button>
           </motion.div>
         </div>
 

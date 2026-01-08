@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { ChevronRight, Moon, Heart } from "lucide-react";
-import type { Player } from "../types/game";
+import type { Player, Card } from "../types/game";
+import { Card as CardComponent } from "./Card";
 
 interface RoundSummaryOverlayProps {
   players: Player[];
@@ -8,6 +9,7 @@ interface RoundSummaryOverlayProps {
   roundScores: number[];
   totalScores: number[];
   shotTheMoon?: { playerIndex: number } | null;
+  pointsCardsTaken?: Card[][]; // Penalty cards (points cards) taken by each player
   onNextRound: () => void;
   isLoading?: boolean;
 }
@@ -18,6 +20,7 @@ export function RoundSummaryOverlay({
   roundScores,
   totalScores,
   shotTheMoon,
+  pointsCardsTaken,
   onNextRound,
   isLoading,
 }: RoundSummaryOverlayProps) {
@@ -149,6 +152,66 @@ export function RoundSummaryOverlay({
             })}
           </motion.div>
 
+          {/* Points Cards Taken Section */}
+          {pointsCardsTaken &&
+            pointsCardsTaken.some((cards) => cards.length > 0) && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="bg-black/30 rounded-xl overflow-hidden mb-6"
+              >
+                <div className="px-4 py-3 bg-white/5 border-b border-white/10">
+                  <div className="text-sm font-semibold text-white/60">
+                    Cards Taken
+                  </div>
+                </div>
+                {players.map((player, index) => {
+                  const playerCards = pointsCardsTaken[index] || [];
+                  if (playerCards.length === 0) return null;
+
+                  return (
+                    <motion.div
+                      key={`cards-${player.id}`}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.45 + index * 0.05 }}
+                      className="px-4 py-3 border-b border-white/5 last:border-b-0"
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xs font-medium text-white/70">
+                          {player.name}
+                          {player.isAI && " 🤖"}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {playerCards.map((card: Card, cardIdx: number) => (
+                          <motion.div
+                            key={`${card.suit}-${card.rank}-${cardIdx}`}
+                            initial={{ scale: 0, rotate: -180 }}
+                            animate={{ scale: 1, rotate: 0 }}
+                            transition={{
+                              delay: 0.5 + index * 0.05 + cardIdx * 0.03,
+                              type: "spring",
+                              stiffness: 200,
+                              damping: 20,
+                            }}
+                          >
+                            <CardComponent
+                              suit={card.suit}
+                              rank={card.rank}
+                              isMini={true}
+                              className="w-10 h-14 md:w-12 md:h-16"
+                            />
+                          </motion.div>
+                        ))}
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </motion.div>
+            )}
+
           {/* Progress indicator - how close to game end */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -194,9 +257,11 @@ export function RoundSummaryOverlay({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.7 }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={onNextRound}
             disabled={isLoading}
-            className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-900/30"
+            className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-900/30 cursor-pointer"
           >
             {isLoading ? (
               "Dealing cards..."

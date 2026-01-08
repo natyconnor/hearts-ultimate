@@ -2,7 +2,6 @@ import type { Card, GameState } from "../types/game";
 import {
   canPlayCard,
   getTrickWinner,
-  calculateTrickPoints,
   shouldBreakHearts,
   isRoundComplete,
   checkShootingTheMoon,
@@ -10,6 +9,7 @@ import {
   getNextPlayerIndex,
   findPlayerWithTwoOfClubs,
   isFirstTrick,
+  isPenaltyCard,
 } from "./rules";
 import { getPassDirection } from "./passingLogic";
 import { cardsEqual } from "./cardDisplay";
@@ -73,12 +73,16 @@ export function playCard(
   // Check if trick is complete (all 4 players have played)
   const trickComplete = updatedTrick.length === 4;
 
+  // Initialize pointsCardsTaken if not present
+  const pointsCardsTaken = gameState.pointsCardsTaken ?? [[], [], [], []];
+
   let finalGameState: GameState = {
     ...gameState,
     players: updatedPlayers,
     hands: updatedHands,
     currentTrick: updatedTrick,
     heartsBroken: newHeartsBroken,
+    pointsCardsTaken,
   };
 
   if (trickComplete) {
@@ -89,15 +93,29 @@ export function playCard(
       (p) => p.id === winnerPlayerId
     );
 
-    // Calculate points for this trick
-    const trickPoints = calculateTrickPoints(updatedTrick);
+    // Track penalty cards taken by the winner (only penalty cards: hearts + Q♠)
+    const updatedPointsCardsTaken = gameState.pointsCardsTaken
+      ? gameState.pointsCardsTaken.map((cards) => [...cards])
+      : [[], [], [], []]; // Initialize if not present
 
-    // Update round scores
-    const updatedRoundScores = [...gameState.roundScores];
-    Object.entries(trickPoints).forEach(([pid, points]) => {
-      const pIndex = updatedPlayers.findIndex((p) => p.id === pid);
-        updatedRoundScores[pIndex] += points;
+    // Calculate total points from penalty cards in this trick
+    // All penalty cards in a trick go to the winner
+    let trickPointsTotal = 0;
+    updatedTrick.forEach(({ card }) => {
+      if (isPenaltyCard(card)) {
+        updatedPointsCardsTaken[winnerPlayerIndex].push(card);
+        // Count points: hearts = 1pt each, Q♠ = 13pts
+        if (card.suit === "hearts") {
+          trickPointsTotal += 1;
+        } else if (card.suit === "spades" && card.rank === 12) {
+          trickPointsTotal += 13;
+        }
+      }
     });
+
+    // Update round scores - all points from this trick go to the winner
+    const updatedRoundScores = [...gameState.roundScores];
+    updatedRoundScores[winnerPlayerIndex] += trickPointsTotal;
 
     // Check if round is complete
     const roundComplete = isRoundComplete(finalGameState);
@@ -138,6 +156,7 @@ export function playCard(
         isRoundComplete: true,
         isGameOver: gameOver,
         winnerIndex: gameWinnerIndex,
+        pointsCardsTaken: updatedPointsCardsTaken,
       };
 
       // If game is over, we'll handle status update in the component
@@ -154,6 +173,7 @@ export function playCard(
       roundScores: updatedRoundScores,
       currentPlayerIndex: winnerPlayerIndex,
       trickLeaderIndex: winnerPlayerIndex,
+      pointsCardsTaken: updatedPointsCardsTaken,
     };
   } else {
     // Move to next player
@@ -223,6 +243,7 @@ export function startRoundWithPassingPhase(
     passDirection,
     isPassingPhase: passDirection !== "none",
     passSubmissions: passDirection !== "none" ? [] : undefined,
+    pointsCardsTaken: [[], [], [], []], // Initialize points cards taken for new round
   };
 
   // If no passing this round, initialize for play immediately
@@ -295,6 +316,7 @@ export function prepareNewRound(
     isRoundComplete: false,
     passDirection,
     isPassingPhase: passDirection !== "none",
+    pointsCardsTaken: [[], [], [], []], // Initialize points cards taken for new round
     passSubmissions: passDirection !== "none" ? [] : undefined,
   };
 
@@ -345,6 +367,7 @@ export function resetGameForNewGame(
     passDirection,
     isPassingPhase: passDirection !== "none",
     passSubmissions: passDirection !== "none" ? [] : undefined,
+    pointsCardsTaken: [[], [], [], []], // Initialize points cards taken for new game
   };
 
   // Stay in passing phase
