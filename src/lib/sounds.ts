@@ -106,8 +106,7 @@ class SoundManager {
 
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(this.volume * 0.6, now);
-    gain.gain.exponentialDecayTo?.(0.001, now + 0.05) ??
-      gain.gain.setTargetAtTime(0.001, now, 0.02);
+    gain.gain.setTargetAtTime(0.001, now, 0.02);
 
     noise.connect(filter);
     filter.connect(gain);

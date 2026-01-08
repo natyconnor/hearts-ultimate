@@ -208,7 +208,8 @@ export function PassingPhaseOverlay({
                   <Card
                     suit={card.suit}
                     rank={card.rank}
-                    className="w-16 h-24 md:w-20 md:h-28"
+                    isMini={true}
+                    className="w-10 h-14 md:w-12 md:h-16"
                   />
                 </motion.div>
               ))}
@@ -251,7 +252,8 @@ export function PassingPhaseOverlay({
                       <Card
                         suit={card.suit}
                         rank={card.rank}
-                        className="w-12 h-16 md:w-14 md:h-20"
+                        isMini={true}
+                        className="w-10 h-14 md:w-12 md:h-16"
                       />
                     </motion.div>
                   ))}

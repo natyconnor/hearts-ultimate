@@ -142,7 +142,7 @@ export function Card({
               suitColor
             )}
           >
-            <div className="leading-none">{rankStr}</div>
+            <div className="leading-none mb-1">{rankStr}</div>
             <div className="text-[clamp(0.5rem,1.5vw,0.8rem)] leading-none -mt-0.5">
               {suitSymbol}
             </div>
@@ -155,7 +155,7 @@ export function Card({
               suitColor
             )}
           >
-            <div className="leading-none">{rankStr}</div>
+            <div className="leading-none mb-1">{rankStr}</div>
             <div className="text-[clamp(0.5rem,1.5vw,0.8rem)] leading-none -mt-0.5">
               {suitSymbol}
             </div>

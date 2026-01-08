@@ -185,37 +185,46 @@ export function GameEndOverlay({
         </div>
 
         {/* Confetti-like decorations */}
-        {[...Array(12)].map((_, i) => (
-          <motion.div
-            key={i}
-            initial={{
-              opacity: 0,
-              scale: 0,
-              x: "50%",
-              y: "50%",
-            }}
-            animate={{
-              opacity: [0, 1, 0],
-              scale: [0, 1, 0.5],
-              x: `${50 + (Math.random() - 0.5) * 100}%`,
-              y: `${50 + (Math.random() - 0.5) * 100}%`,
-            }}
-            transition={{
-              duration: 1.5,
-              delay: 0.2 + i * 0.05,
-              ease: "easeOut",
-            }}
-            className={`absolute w-3 h-3 rounded-full ${
-              ["bg-yellow-400", "bg-amber-400", "bg-orange-400", "bg-red-400"][
-                i % 4
-              ]
-            }`}
-            style={{
-              left: 0,
-              top: 0,
-            }}
-          />
-        ))}
+        {[...Array(12)].map((_, i) => {
+          // Pre-calculate random positions to avoid calling Math.random during render
+          const randomX = 50 + Math.sin(i * 0.5) * 50;
+          const randomY = 50 + Math.cos(i * 0.7) * 50;
+
+          return (
+            <motion.div
+              key={i}
+              initial={{
+                opacity: 0,
+                scale: 0,
+                x: "50%",
+                y: "50%",
+              }}
+              animate={{
+                opacity: [0, 1, 0],
+                scale: [0, 1, 0.5],
+                x: `${randomX}%`,
+                y: `${randomY}%`,
+              }}
+              transition={{
+                duration: 1.5,
+                delay: 0.2 + i * 0.05,
+                ease: "easeOut",
+              }}
+              className={`absolute w-3 h-3 rounded-full ${
+                [
+                  "bg-yellow-400",
+                  "bg-amber-400",
+                  "bg-orange-400",
+                  "bg-red-400",
+                ][i % 4]
+              }`}
+              style={{
+                left: 0,
+                top: 0,
+              }}
+            />
+          );
+        })}
       </motion.div>
     </motion.div>
   );
