@@ -124,6 +124,35 @@ export interface TrickCardPosition {
 }
 
 /**
+ * Converts a game player index to a visual position relative to the current player.
+ * Visual positions: 0=bottom (self), 1=left, 2=top, 3=right
+ *
+ * @param gameIndex - The absolute player index in the game (0-3)
+ * @param currentPlayerIndex - The index of the player viewing the game
+ * @returns The visual position (0-3) where the player should appear
+ */
+export function gameIndexToVisualPosition(
+  gameIndex: number,
+  currentPlayerIndex: number
+): number {
+  return (gameIndex - currentPlayerIndex + 4) % 4;
+}
+
+/**
+ * Converts a visual position back to a game player index.
+ *
+ * @param visualPosition - The visual position (0=bottom, 1=left, 2=top, 3=right)
+ * @param currentPlayerIndex - The index of the player viewing the game
+ * @returns The absolute player index in the game (0-3)
+ */
+export function visualPositionToGameIndex(
+  visualPosition: number,
+  currentPlayerIndex: number
+): number {
+  return (visualPosition + currentPlayerIndex) % 4;
+}
+
+/**
  * Gets the position for a card in the trick circle based on player index
  */
 export function getTrickCardPosition(playerIndex: number): TrickCardPosition {

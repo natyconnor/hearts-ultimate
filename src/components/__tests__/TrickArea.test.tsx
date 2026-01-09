@@ -49,7 +49,7 @@ describe("TrickArea", () => {
         displayTrick={[]}
         players={players}
         gameState={null}
-        currentPlayerIndex={0}
+        myGameIndex={0}
         isShowingCompletedTrick={false}
         animatingToWinner={false}
       />
@@ -76,7 +76,7 @@ describe("TrickArea", () => {
         displayTrick={displayTrick}
         players={players}
         gameState={createMockGameState()}
-        currentPlayerIndex={0}
+        myGameIndex={0}
         isShowingCompletedTrick={false}
         animatingToWinner={false}
       />
@@ -112,7 +112,7 @@ describe("TrickArea", () => {
         displayTrick={displayTrick}
         players={players}
         gameState={gameState}
-        currentPlayerIndex={0}
+        myGameIndex={0}
         isShowingCompletedTrick={true}
         animatingToWinner={false}
       />
@@ -143,7 +143,7 @@ describe("TrickArea", () => {
         displayTrick={displayTrick}
         players={players}
         gameState={gameState}
-        currentPlayerIndex={0}
+        myGameIndex={0}
         isShowingCompletedTrick={true}
         animatingToWinner={false}
       />
@@ -174,7 +174,7 @@ describe("TrickArea", () => {
         displayTrick={displayTrick}
         players={players}
         gameState={gameState}
-        currentPlayerIndex={0}
+        myGameIndex={0}
         isShowingCompletedTrick={false}
         animatingToWinner={false}
       />

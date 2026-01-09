@@ -5,6 +5,7 @@ import {
   getTrickCardPosition,
   getPlayerStartPosition,
   getWinnerPosition,
+  gameIndexToVisualPosition,
 } from "../game/cardDisplay";
 import type { Card as CardType, Player, GameState } from "../types/game";
 
@@ -12,7 +13,7 @@ interface TrickAreaProps {
   displayTrick: Array<{ playerId: string; card: CardType }>;
   players: Player[];
   gameState: GameState | null;
-  currentPlayerIndex: number;
+  myGameIndex: number;
   isShowingCompletedTrick: boolean;
   animatingToWinner: boolean;
 }
@@ -21,7 +22,7 @@ export function TrickArea({
   displayTrick,
   players,
   gameState,
-  currentPlayerIndex,
+  myGameIndex,
   isShowingCompletedTrick,
   animatingToWinner,
 }: TrickAreaProps) {
@@ -36,7 +37,7 @@ export function TrickArea({
             className="absolute top-[-120px] left-1/2 transform -translate-x-1/2 bg-green-500/90 text-white text-sm font-bold px-4 py-1.5 rounded-full shadow-lg z-20 whitespace-nowrap"
           >
             🏆{" "}
-            {gameState.lastTrickWinnerIndex === currentPlayerIndex
+            {gameState.lastTrickWinnerIndex === myGameIndex
               ? "You win!"
               : `${players[gameState.lastTrickWinnerIndex]?.name} wins!`}
           </motion.div>
@@ -44,24 +45,39 @@ export function TrickArea({
       <div className="flex flex-col gap-2 items-center justify-center min-w-[280px] min-h-[200px]">
         <div className="relative w-[220px] h-[200px]">
           {displayTrick.map((trickCard) => {
-            const trickPlayerIndex = players.findIndex(
+            // Find the game index of the player who played this card
+            const trickPlayerGameIndex = players.findIndex(
               (p) => p.id === trickCard.playerId
             );
+
+            // Convert to visual position (where the card should appear on screen)
+            const visualPosition =
+              myGameIndex >= 0
+                ? gameIndexToVisualPosition(trickPlayerGameIndex, myGameIndex)
+                : trickPlayerGameIndex;
 
             // Check if this card is the winning card
             const isWinning =
               isShowingCompletedTrick &&
-              gameState?.lastTrickWinnerIndex === trickPlayerIndex;
+              gameState?.lastTrickWinnerIndex === trickPlayerGameIndex;
 
-            // Position card based on which player played it
-            const cardPos = getTrickCardPosition(trickPlayerIndex);
-            const startPos = getPlayerStartPosition(trickPlayerIndex);
+            // Position card based on visual position (rotated for current player's perspective)
+            const cardPos = getTrickCardPosition(visualPosition);
+            const startPos = getPlayerStartPosition(visualPosition);
 
-            // If animating to winner, calculate final position
-            const winnerPos =
+            // If animating to winner, calculate final position (use visual position of winner)
+            const winnerVisualPosition =
               animatingToWinner &&
-              gameState?.lastTrickWinnerIndex !== undefined
-                ? getWinnerPosition(gameState.lastTrickWinnerIndex)
+              gameState?.lastTrickWinnerIndex !== undefined &&
+              myGameIndex >= 0
+                ? gameIndexToVisualPosition(
+                    gameState.lastTrickWinnerIndex,
+                    myGameIndex
+                  )
+                : gameState?.lastTrickWinnerIndex;
+            const winnerPos =
+              animatingToWinner && winnerVisualPosition !== undefined
+                ? getWinnerPosition(winnerVisualPosition)
                 : null;
 
             return (

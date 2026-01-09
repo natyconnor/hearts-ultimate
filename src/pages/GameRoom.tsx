@@ -54,6 +54,9 @@ export function GameRoom() {
   const isAnimatingRef = useRef(false);
   const showRoundSummaryRef = useRef(false);
   const showGameEndRef = useRef(false);
+  // Track what round/game state we've already shown overlays for (to handle realtime updates)
+  const lastProcessedRoundRef = useRef<number | null>(null);
+  const lastProcessedGameOverRef = useRef<boolean>(false);
 
   const { isConnected, error: realtimeError } = useGameRealtime(slug ?? null);
 
@@ -145,6 +148,56 @@ export function GameRoom() {
     roomStatus,
     enabled: !!(slug && room && currentPlayerId),
   });
+
+  // Watch for round/game completion via realtime updates (for players who didn't play the last card)
+  // This ensures all players see the round summary and game end overlays
+  useEffect(() => {
+    if (!currentGameState || isAnimatingRef.current) return;
+
+    const roundNumber = currentGameState.roundNumber;
+    const isGameOver = currentGameState.isGameOver ?? false;
+    const isRoundComplete = currentGameState.isRoundComplete ?? false;
+
+    // Reset tracking refs when a new game starts (round 1, not complete, not game over)
+    if (roundNumber === 1 && !isRoundComplete && !isGameOver) {
+      lastProcessedRoundRef.current = null;
+      lastProcessedGameOverRef.current = false;
+    }
+
+    // Show game end overlay when game is over (and we haven't shown it yet)
+    if (
+      isGameOver &&
+      currentGameState.winnerIndex !== undefined &&
+      !lastProcessedGameOverRef.current
+    ) {
+      lastProcessedGameOverRef.current = true;
+      // Schedule state update to avoid synchronous cascading renders
+      queueMicrotask(() => {
+        setShowGameEnd(true);
+        showGameEndRef.current = true;
+      });
+    }
+    // Show round summary when round is complete (but not game over)
+    // Only show if we haven't already processed this round
+    else if (
+      isRoundComplete &&
+      !isGameOver &&
+      lastProcessedRoundRef.current !== roundNumber
+    ) {
+      lastProcessedRoundRef.current = roundNumber;
+      // Schedule state update to avoid synchronous cascading renders
+      queueMicrotask(() => {
+        setShowRoundSummary(true);
+        showRoundSummaryRef.current = true;
+      });
+    }
+  }, [
+    currentGameState?.isRoundComplete,
+    currentGameState?.isGameOver,
+    currentGameState?.winnerIndex,
+    currentGameState?.roundNumber,
+    currentGameState,
+  ]);
 
   // Auto-advance round summary in test mode
   useEffect(() => {

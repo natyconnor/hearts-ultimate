@@ -3,6 +3,7 @@ import { CardHand } from "./CardHand";
 import type { Card as CardType, Player, GameState } from "../types/game";
 import { cn } from "../lib/utils";
 import { getValidCards, isFirstTrick } from "../game/rules";
+import { visualPositionToGameIndex } from "../game/cardDisplay";
 import { DifficultyBadge } from "./DifficultyBadge";
 import { TrickArea } from "./TrickArea";
 import { GameIndicators } from "./GameIndicators";
@@ -33,23 +34,32 @@ export function GameTable({
   onCardClick,
   className,
 }: GameTableProps) {
-  // Get player at each position
-  const getPlayerAtPosition = (index: number): Player | null => {
-    return players[index] || null;
+  // Get current player's game index (the player viewing this screen)
+  const myGameIndex = players.findIndex((p) => p.id === currentPlayerId);
+
+  // Get player at each visual position (0=bottom/self, 1=left, 2=top, 3=right)
+  // This rotates the view so current player is always at the bottom
+  const getPlayerAtVisualPosition = (visualPosition: number): Player | null => {
+    if (myGameIndex < 0) {
+      // Fallback if not found - use absolute positions
+      return players[visualPosition] || null;
+    }
+    const gameIndex = visualPositionToGameIndex(visualPosition, myGameIndex);
+    return players[gameIndex] || null;
   };
 
-  // Get current player's index
-  const currentPlayerIndex = players.findIndex((p) => p.id === currentPlayerId);
+  // Get the game index for a visual position
+  const getGameIndexForVisualPosition = (visualPosition: number): number => {
+    if (myGameIndex < 0) return visualPosition;
+    return visualPositionToGameIndex(visualPosition, myGameIndex);
+  };
 
-  // Get valid cards for current player
-  const currentPlayer =
-    currentPlayerIndex >= 0 ? players[currentPlayerIndex] : null;
+  // Get valid cards for current player (the one viewing the screen)
+  const myPlayer = myGameIndex >= 0 ? players[myGameIndex] : null;
   const validCards =
-    gameState &&
-    currentPlayer &&
-    currentPlayerIndex === gameState.currentPlayerIndex
+    gameState && myPlayer && myGameIndex === gameState.currentPlayerIndex
       ? getValidCards(
-          currentPlayer.hand,
+          myPlayer.hand,
           gameState.currentTrick,
           gameState.heartsBroken,
           isFirstTrick(gameState)
@@ -107,7 +117,7 @@ export function GameTable({
             displayTrick={displayTrick}
             players={players}
             gameState={gameState}
-            currentPlayerIndex={currentPlayerIndex}
+            myGameIndex={myGameIndex}
             isShowingCompletedTrick={isShowingCompletedTrick ?? false}
             animatingToWinner={animatingToWinner ?? false}
           />
@@ -116,22 +126,20 @@ export function GameTable({
 
           {/* Bottom Player (Current User) - Full fanned hand */}
           <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 pb-2 md:pb-4">
-            {getPlayerAtPosition(0) && (
+            {getPlayerAtVisualPosition(0) && (
               <div className="flex flex-col items-center" ref={cardHandRef}>
                 {/* Badges above player's hand */}
                 <GameIndicators
                   gameState={gameState}
-                  playerHand={getPlayerAtPosition(0)?.hand || []}
+                  playerHand={getPlayerAtVisualPosition(0)?.hand || []}
                 />
                 <CardHand
-                  cards={getPlayerAtPosition(0)?.hand || []}
-                  isFlipped={currentPlayerIndex !== 0}
-                  onCardClick={
-                    currentPlayerIndex === 0 ? onCardClick : undefined
-                  }
+                  cards={getPlayerAtVisualPosition(0)?.hand || []}
+                  isFlipped={myGameIndex < 0}
+                  onCardClick={myGameIndex >= 0 ? onCardClick : undefined}
                   validCards={
-                    currentPlayerIndex === 0 &&
-                    gameState?.currentPlayerIndex === 0
+                    myGameIndex >= 0 &&
+                    gameState?.currentPlayerIndex === myGameIndex
                       ? validCards
                       : undefined
                   }
@@ -141,32 +149,33 @@ export function GameTable({
                   <div
                     className={cn(
                       "text-white font-semibold text-sm md:text-lg px-3 md:px-4 py-1 rounded-full transition-all",
-                      gameState?.currentPlayerIndex === 0
+                      gameState?.currentPlayerIndex === myGameIndex
                         ? "bg-yellow-500/80 shadow-[0_0_12px_rgba(234,179,8,0.6)]"
-                        : gameState?.trickLeaderIndex === 0
+                        : gameState?.trickLeaderIndex === myGameIndex
                         ? "bg-emerald-500/80 shadow-[0_0_12px_rgba(16,185,129,0.6)]"
                         : "bg-black/30"
                     )}
                   >
-                    {getPlayerAtPosition(0)?.name}
-                    {getPlayerAtPosition(0)?.isAI && " 🤖"}
-                    {currentPlayerIndex === 0 && " (You)"}
-                    {gameState?.currentPlayerIndex === 0 && " - Your Turn"}
-                    {gameState?.trickLeaderIndex === 0 &&
-                      gameState?.currentPlayerIndex !== 0 &&
+                    {getPlayerAtVisualPosition(0)?.name}
+                    {getPlayerAtVisualPosition(0)?.isAI && " 🤖"}
+                    {myGameIndex >= 0 && " (You)"}
+                    {gameState?.currentPlayerIndex === myGameIndex &&
+                      " - Your Turn"}
+                    {gameState?.trickLeaderIndex === myGameIndex &&
+                      gameState?.currentPlayerIndex !== myGameIndex &&
                       " 👑"}
                   </div>
-                  {getPlayerAtPosition(0)?.isAI && (
+                  {getPlayerAtVisualPosition(0)?.isAI && (
                     <DifficultyBadge
-                      difficulty={getPlayerAtPosition(0)?.difficulty}
+                      difficulty={getPlayerAtVisualPosition(0)?.difficulty}
                       size="md"
                     />
                   )}
                 </div>
-                {gameState && (
+                {gameState && myGameIndex >= 0 && (
                   <div className="text-white/80 text-xs mt-1">
-                    Score: {gameState.scores[0]} | Round:{" "}
-                    {gameState.roundScores[0]}
+                    Score: {gameState.scores[myGameIndex]} | Round:{" "}
+                    {gameState.roundScores[myGameIndex]}
                   </div>
                 )}
               </div>
@@ -174,30 +183,30 @@ export function GameTable({
           </div>
 
           {/* Top Player - Compact stacked cards */}
-          {getPlayerAtPosition(2) && (
+          {getPlayerAtVisualPosition(2) && (
             <OpponentHand
-              player={getPlayerAtPosition(2)!}
-              playerIndex={2}
+              player={getPlayerAtVisualPosition(2)!}
+              playerIndex={getGameIndexForVisualPosition(2)}
               gameState={gameState}
               position="top"
             />
           )}
 
-          {/* Left Player (Player 1 - clockwise from bottom) - Vertical stacked cards */}
-          {getPlayerAtPosition(1) && (
+          {/* Left Player (clockwise from bottom) - Vertical stacked cards */}
+          {getPlayerAtVisualPosition(1) && (
             <OpponentHand
-              player={getPlayerAtPosition(1)!}
-              playerIndex={1}
+              player={getPlayerAtVisualPosition(1)!}
+              playerIndex={getGameIndexForVisualPosition(1)}
               gameState={gameState}
               position="left"
             />
           )}
 
-          {/* Right Player (Player 3 - clockwise continues) - Vertical stacked cards */}
-          {getPlayerAtPosition(3) && (
+          {/* Right Player (clockwise continues) - Vertical stacked cards */}
+          {getPlayerAtVisualPosition(3) && (
             <OpponentHand
-              player={getPlayerAtPosition(3)!}
-              playerIndex={3}
+              player={getPlayerAtVisualPosition(3)!}
+              playerIndex={getGameIndexForVisualPosition(3)}
               gameState={gameState}
               position="right"
             />
