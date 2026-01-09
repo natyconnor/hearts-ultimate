@@ -4,6 +4,8 @@ export const STORAGE_KEYS = {
   AI_DIFFICULTY: "hearts-ai-difficulty",
   SOUND_ENABLED: "hearts-sound-enabled",
   SOUND_VOLUME: "hearts-sound-volume",
+  SPECTATOR_ID: "hearts-spectator-id",
+  SPECTATOR_NAME: "hearts-spectator-name",
 } as const;
 
 export const GAME_CONFIG = {

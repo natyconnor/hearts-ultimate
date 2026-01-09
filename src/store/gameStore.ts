@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { GameState, Player, Card } from "../types/game";
+import type { GameState, Player, Card, Spectator } from "../types/game";
 
 interface CurrentRoom {
   roomId: string | null;
@@ -16,6 +16,7 @@ interface RoomData {
 interface GameStore {
   currentRoom: CurrentRoom;
   players: Player[];
+  spectators: Spectator[];
   gameState: GameState | null;
   ui: {
     isLoading: boolean;
@@ -23,6 +24,7 @@ interface GameStore {
   };
   setCurrentRoom: (roomData: RoomData) => void;
   updateGameState: (newGameState: GameState) => void;
+  updateSpectators: (spectators: Spectator[]) => void;
   addPlayer: (playerName: string, isAI: boolean) => void;
   playCard: (playerId: string, card: Card) => void;
   resetGame: () => void;
@@ -38,6 +40,7 @@ const initialState = {
     status: null,
   },
   players: [],
+  spectators: [],
   gameState: null,
   ui: {
     isLoading: false,
@@ -61,6 +64,11 @@ export const useGameStore = create<GameStore>((set) => ({
     set({
       gameState: newGameState,
       players: newGameState.players,
+    }),
+
+  updateSpectators: (spectators) =>
+    set({
+      spectators,
     }),
 
   addPlayer: (playerName, isAI) =>
@@ -123,6 +131,7 @@ export const useGameStore = create<GameStore>((set) => ({
         slug: null,
         status: null,
       },
+      spectators: [],
     }),
 
   setLoading: (isLoading) =>

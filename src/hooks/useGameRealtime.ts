@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "../supabaseClient";
 import { useGameStore } from "../store/gameStore";
-import type { GameState } from "../types/game";
+import type { GameState, Spectator } from "../types/game";
 
 interface UseGameRealtimeReturn {
   isConnected: boolean;
@@ -15,6 +15,7 @@ export function useGameRealtime(slug: string | null): UseGameRealtimeReturn {
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const {
     updateGameState,
+    updateSpectators,
     setError: setStoreError,
     setCurrentRoom,
   } = useGameStore();
@@ -49,6 +50,10 @@ export function useGameRealtime(slug: string | null): UseGameRealtimeReturn {
               if ("game_state" in payload.new) {
                 const gameState = payload.new.game_state as GameState;
                 updateGameState(gameState);
+              }
+              if ("spectators" in payload.new) {
+                const spectators = (payload.new.spectators as Spectator[]) ?? [];
+                updateSpectators(spectators);
               }
               if ("status" in payload.new) {
                 const status = payload.new.status as
@@ -99,7 +104,7 @@ export function useGameRealtime(slug: string | null): UseGameRealtimeReturn {
     return () => {
       unsubscribe();
     };
-  }, [slug, updateGameState, setStoreError, setCurrentRoom]);
+  }, [slug, updateGameState, updateSpectators, setStoreError, setCurrentRoom]);
 
   return {
     isConnected,

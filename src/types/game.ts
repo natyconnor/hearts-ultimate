@@ -73,10 +73,16 @@ export interface GameState {
   shotTheMoon?: { playerIndex: number } | null;
 }
 
+export interface Spectator {
+  id: string;
+  name: string;
+}
+
 export interface GameRoom {
   id: string;
   slug: string;
   createdAt?: string;
   gameState: GameState;
   status: "waiting" | "playing" | "finished";
+  spectators: Spectator[];
 }

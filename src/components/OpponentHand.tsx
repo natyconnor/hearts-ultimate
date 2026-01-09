@@ -11,22 +11,27 @@ interface OpponentHandProps {
   playerIndex: number;
   gameState: GameState | null;
   position: Position;
+  /** When true, cards are shown face-up (for spectator mode) */
+  showCards?: boolean;
 }
 
 const POSITION_CONFIGS = {
   top: {
     containerClass: "absolute top-2 md:top-4 left-1/2 transform -translate-x-1/2",
-    stackClass: "flex -space-x-8 md:-space-x-12",
+    // Spread cards enough to show ranks (about 16px visible per card)
+    stackClass: "flex -space-x-5 md:-space-x-6",
     cardAnimation: { initial: { opacity: 0, y: -20 }, animate: { opacity: 1, y: 0 } },
   },
   left: {
     containerClass: "absolute left-2 md:left-4 top-1/2 transform -translate-y-1/2",
-    stackClass: "flex flex-col -space-y-10 md:-space-y-14",
+    // Vertical stacking - tighter overlap
+    stackClass: "flex flex-col -space-y-8 md:-space-y-9",
     cardAnimation: { initial: { opacity: 0, x: -20 }, animate: { opacity: 1, x: 0 } },
   },
   right: {
     containerClass: "absolute right-2 md:right-4 top-1/2 transform -translate-y-1/2",
-    stackClass: "flex flex-col -space-y-10 md:-space-y-14",
+    // Vertical stacking - tighter overlap
+    stackClass: "flex flex-col -space-y-8 md:-space-y-9",
     cardAnimation: { initial: { opacity: 0, x: 20 }, animate: { opacity: 1, x: 0 } },
   },
 };
@@ -36,6 +41,7 @@ export function OpponentHand({
   playerIndex,
   gameState,
   position,
+  showCards = false,
 }: OpponentHandProps) {
   const config = POSITION_CONFIGS[position];
 
@@ -83,8 +89,9 @@ export function OpponentHand({
               <Card
                 suit={card.suit}
                 rank={card.rank}
-                isFlipped={true}
-                className="w-12 h-16 md:w-14 md:h-20"
+                isFlipped={!showCards}
+                isMini={showCards}
+                className="w-8 h-11 md:w-10 md:h-14"
               />
             </motion.div>
           ))}

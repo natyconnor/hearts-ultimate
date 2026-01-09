@@ -7,7 +7,7 @@ export function useRoomSync(
   room: GameRoom | null | undefined,
   slug: string | undefined
 ) {
-  const { setCurrentRoom, updateGameState, currentRoom } = useGameStore();
+  const { setCurrentRoom, updateGameState, updateSpectators, currentRoom } = useGameStore();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -19,7 +19,8 @@ export function useRoomSync(
       status: room.status,
     });
     updateGameState(room.gameState);
-  }, [room, setCurrentRoom, updateGameState]);
+    updateSpectators(room.spectators);
+  }, [room, setCurrentRoom, updateGameState, updateSpectators]);
 
   useEffect(() => {
     if (currentRoom.status && room && currentRoom.status !== room.status) {

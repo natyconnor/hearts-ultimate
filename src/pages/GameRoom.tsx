@@ -10,6 +10,7 @@ import { usePageUnloadWarning } from "../hooks/usePageUnloadWarning";
 import {
   useLobbyMutations,
   useGameplayMutations,
+  useSpectatorMutations,
 } from "../hooks/useGameMutations";
 import { useGameStore } from "../store/gameStore";
 import { STORAGE_KEYS } from "../lib/constants";
@@ -24,6 +25,7 @@ import { ReceivedCardsOverlay } from "../components/ReceivedCardsOverlay";
 import { AIDebugOverlay } from "../components/AIDebugOverlay";
 import { GameLobby } from "../components/GameLobby";
 import { GameHeader } from "../components/GameHeader";
+import { SpectatorControls } from "../components/SpectatorControls";
 import type { Card as CardType } from "../types/game";
 
 export function GameRoom() {
@@ -32,15 +34,21 @@ export function GameRoom() {
   const navigate = useNavigate();
   const {
     gameState,
+    spectators,
     currentRoom,
     setCurrentRoom,
     updateGameState,
+    updateSpectators,
     clearCurrentRoom,
   } = useGameStore();
 
   const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(() =>
     localStorage.getItem(STORAGE_KEYS.PLAYER_ID)
   );
+  const [currentSpectatorId, setCurrentSpectatorId] = useState<string | null>(
+    () => localStorage.getItem(STORAGE_KEYS.SPECTATOR_ID)
+  );
+  const [watchingPlayerIndex, setWatchingPlayerIndex] = useState(0);
   const [selectedCard, setSelectedCard] = useState<CardType | null>(null);
   const [showCompletedTrick, setShowCompletedTrick] = useState(false);
   const [animatingToWinner, setAnimatingToWinner] = useState(false);
@@ -121,10 +129,18 @@ export function GameRoom() {
     },
   });
 
+  const spectatorMutations = useSpectatorMutations({
+    slug,
+    spectatorId: currentSpectatorId,
+    setSpectatorId: setCurrentSpectatorId,
+    setSpectators: updateSpectators,
+  });
+
   useEffect(() => {
     return () => {
       const storedPlayerId = localStorage.getItem(STORAGE_KEYS.PLAYER_ID);
-      if (!storedPlayerId) {
+      const storedSpectatorId = localStorage.getItem(STORAGE_KEYS.SPECTATOR_ID);
+      if (!storedPlayerId && !storedSpectatorId) {
         clearCurrentRoom();
       }
     };
@@ -134,6 +150,10 @@ export function GameRoom() {
     ? players.find((p) => p.id === currentPlayerId) ?? null
     : null;
   const isPlayerInRoom = !!currentPlayer;
+  const isSpectating = !!currentSpectatorId;
+  const currentSpectator = currentSpectatorId
+    ? spectators.find((s) => s.id === currentSpectatorId) ?? null
+    : null;
 
   useRoomNavigationBlocker({
     slug: slug ?? null,
@@ -146,8 +166,34 @@ export function GameRoom() {
   usePageUnloadWarning({
     isPlayerInRoom,
     roomStatus,
-    enabled: !!(slug && room && currentPlayerId),
+    enabled: !!(slug && room && (currentPlayerId || currentSpectatorId)),
   });
+
+  // Auto-spectate: When visiting a room that's already playing and not a player,
+  // prompt to join as spectator
+  useEffect(() => {
+    if (
+      room &&
+      roomStatus === "playing" &&
+      !isPlayerInRoom &&
+      !isSpectating &&
+      !spectatorMutations.joinSpectator.isPending
+    ) {
+      // User arrived at a game in progress without being a player
+      const spectatorName = prompt(
+        "This game is already in progress. Enter your name to watch as a spectator:"
+      );
+      if (spectatorName && spectatorName.trim()) {
+        spectatorMutations.joinSpectator.mutate(spectatorName.trim());
+      }
+    }
+  }, [
+    room,
+    roomStatus,
+    isPlayerInRoom,
+    isSpectating,
+    spectatorMutations.joinSpectator,
+  ]);
 
   // Watch for round/game completion via realtime updates (for players who didn't play the last card)
   // This ensures all players see the round summary and game end overlays
@@ -261,6 +307,8 @@ export function GameRoom() {
   const handleGoHome = () => {
     localStorage.removeItem(STORAGE_KEYS.PLAYER_ID);
     localStorage.removeItem(STORAGE_KEYS.PLAYER_NAME);
+    localStorage.removeItem(STORAGE_KEYS.SPECTATOR_ID);
+    localStorage.removeItem(STORAGE_KEYS.SPECTATOR_NAME);
     clearCurrentRoom();
     navigate("/");
   };
@@ -381,6 +429,7 @@ export function GameRoom() {
   }
 
   // Show game table when playing or when game just finished (to show GameEndOverlay)
+  // Spectators also see the game table when game is playing
   if (roomStatus === "playing" || (roomStatus === "finished" && showGameEnd)) {
     return (
       <div className="flex flex-col h-screen w-full overflow-hidden bg-gradient-to-b from-gray-800 to-gray-900">
@@ -391,6 +440,19 @@ export function GameRoom() {
           isLeaving={lobbyMutations.leaveRoom.isPending}
           onLeave={handleLeave}
         />
+
+        {/* Spectator Controls - Show when spectating */}
+        {isSpectating && (
+          <div className="px-4 py-2 flex justify-center">
+            <SpectatorControls
+              players={players}
+              spectators={spectators}
+              watchingPlayerIndex={watchingPlayerIndex}
+              onChangeWatchingPlayer={setWatchingPlayerIndex}
+              currentSpectatorName={currentSpectator?.name}
+            />
+          </div>
+        )}
 
         {/* Game Table - Takes remaining space */}
         <div className="flex-1 min-h-0 relative">
@@ -414,6 +476,8 @@ export function GameRoom() {
             animatingToWinner={animatingToWinner}
             cardHandRef={cardHandRef}
             onCardClick={handleCardClick}
+            isSpectating={isSpectating}
+            watchingPlayerIndex={watchingPlayerIndex}
           />
         </div>
 
@@ -450,73 +514,75 @@ export function GameRoom() {
             )}
         </AnimatePresence>
 
-        {/* Passing/Receiving Overlays - Crossfade transition */}
-        <AnimatePresence>
-          {/* Passing Phase Overlay */}
-          {currentGameState?.isPassingPhase &&
-            currentGameState.passDirection &&
-            currentGameState.passDirection !== "none" &&
-            currentPlayerId &&
-            (() => {
-              const playerIndex = players.findIndex(
-                (p) => p.id === currentPlayerId
-              );
-              if (playerIndex === -1) return null;
+        {/* Passing/Receiving Overlays - Crossfade transition (only for players, not spectators) */}
+        {!isSpectating && (
+          <AnimatePresence>
+            {/* Passing Phase Overlay */}
+            {currentGameState?.isPassingPhase &&
+              currentGameState.passDirection &&
+              currentGameState.passDirection !== "none" &&
+              currentPlayerId &&
+              (() => {
+                const playerIndex = players.findIndex(
+                  (p) => p.id === currentPlayerId
+                );
+                if (playerIndex === -1) return null;
 
-              const hasSubmitted = hasPlayerSubmittedPass(
-                currentGameState,
-                currentPlayerId
-              );
-              const waitingForPlayers = players
-                .filter(
-                  (p) =>
-                    !p.isAI && !hasPlayerSubmittedPass(currentGameState, p.id)
-                )
-                .map((p) => p.name);
+                const hasSubmitted = hasPlayerSubmittedPass(
+                  currentGameState,
+                  currentPlayerId
+                );
+                const waitingForPlayers = players
+                  .filter(
+                    (p) =>
+                      !p.isAI && !hasPlayerSubmittedPass(currentGameState, p.id)
+                  )
+                  .map((p) => p.name);
 
-              return (
-                <PassingPhaseOverlay
-                  key="passing-phase"
-                  players={players}
-                  currentPlayerIndex={playerIndex}
-                  passDirection={currentGameState.passDirection}
-                  selectedCards={selectedCardsToPass}
-                  onCardToggle={handlePassCardToggle}
-                  onConfirmPass={handleConfirmPass}
-                  isSubmitting={gameplayMutations.submitPass.isPending}
-                  hasSubmitted={hasSubmitted}
-                  waitingForPlayers={waitingForPlayers}
-                />
-              );
-            })()}
+                return (
+                  <PassingPhaseOverlay
+                    key="passing-phase"
+                    players={players}
+                    currentPlayerIndex={playerIndex}
+                    passDirection={currentGameState.passDirection}
+                    selectedCards={selectedCardsToPass}
+                    onCardToggle={handlePassCardToggle}
+                    onConfirmPass={handleConfirmPass}
+                    isSubmitting={gameplayMutations.submitPass.isPending}
+                    hasSubmitted={hasSubmitted}
+                    waitingForPlayers={waitingForPlayers}
+                  />
+                );
+              })()}
 
-          {/* Reveal Phase Overlay - Shows received cards */}
-          {currentGameState?.isRevealPhase &&
-            currentGameState.passDirection &&
-            currentGameState.receivedCards &&
-            currentPlayerId &&
-            (() => {
-              const playerIndex = players.findIndex(
-                (p) => p.id === currentPlayerId
-              );
-              if (playerIndex === -1) return null;
+            {/* Reveal Phase Overlay - Shows received cards */}
+            {currentGameState?.isRevealPhase &&
+              currentGameState.passDirection &&
+              currentGameState.receivedCards &&
+              currentPlayerId &&
+              (() => {
+                const playerIndex = players.findIndex(
+                  (p) => p.id === currentPlayerId
+                );
+                if (playerIndex === -1) return null;
 
-              const receivedCards =
-                currentGameState.receivedCards[playerIndex] || [];
+                const receivedCards =
+                  currentGameState.receivedCards[playerIndex] || [];
 
-              return (
-                <ReceivedCardsOverlay
-                  key="reveal-phase"
-                  players={players}
-                  currentPlayerIndex={playerIndex}
-                  passDirection={currentGameState.passDirection}
-                  receivedCards={receivedCards}
-                  onReady={() => gameplayMutations.completeReveal.mutate()}
-                  isLoading={gameplayMutations.completeReveal.isPending}
-                />
-              );
-            })()}
-        </AnimatePresence>
+                return (
+                  <ReceivedCardsOverlay
+                    key="reveal-phase"
+                    players={players}
+                    currentPlayerIndex={playerIndex}
+                    passDirection={currentGameState.passDirection}
+                    receivedCards={receivedCards}
+                    onReady={() => gameplayMutations.completeReveal.mutate()}
+                    isLoading={gameplayMutations.completeReveal.isPending}
+                  />
+                );
+              })()}
+          </AnimatePresence>
+        )}
         <AIDebugOverlay />
       </div>
     );
@@ -527,10 +593,13 @@ export function GameRoom() {
     <GameLobby
       slug={slug ?? ""}
       players={players}
+      spectators={spectators}
       currentPlayerId={currentPlayerId}
+      currentSpectatorId={currentSpectatorId}
       isConnected={isConnected}
       roomStatus={roomStatus}
       lobbyMutations={lobbyMutations}
+      spectatorMutations={spectatorMutations}
       realtimeError={realtimeError}
     />
   );

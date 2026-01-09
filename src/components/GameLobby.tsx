@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, Copy, Check } from "lucide-react";
+import { ChevronDown, Copy, Check, Eye } from "lucide-react";
 import { SoundSettings } from "./SoundSettings";
 import { cn } from "../lib/utils";
 import { getDifficultyDisplayName } from "../lib/aiPlayers";
-import type { Player, AIDifficulty } from "../types/game";
+import type { Player, AIDifficulty, Spectator } from "../types/game";
 import type { UseMutationResult } from "@tanstack/react-query";
 
 const DIFFICULTY_OPTIONS: {
@@ -45,23 +45,34 @@ interface LobbyMutations {
   leaveRoom: UseMutationResult<unknown, Error, void>;
 }
 
+interface SpectatorMutations {
+  joinSpectator: UseMutationResult<unknown, Error, string>;
+  leaveSpectator: UseMutationResult<unknown, Error, void>;
+}
+
 interface GameLobbyProps {
   slug: string;
   players: Player[];
+  spectators: Spectator[];
   currentPlayerId: string | null;
+  currentSpectatorId: string | null;
   isConnected: boolean;
   roomStatus: "waiting" | "playing" | "finished";
   lobbyMutations: LobbyMutations;
+  spectatorMutations: SpectatorMutations;
   realtimeError: string | null;
 }
 
 export function GameLobby({
   slug,
   players,
+  spectators,
   currentPlayerId,
+  currentSpectatorId,
   isConnected,
   roomStatus,
   lobbyMutations,
+  spectatorMutations,
   realtimeError,
 }: GameLobbyProps) {
   const [openDifficultyMenu, setOpenDifficultyMenu] = useState<string | null>(
@@ -73,14 +84,23 @@ export function GameLobby({
     ? players.find((p) => p.id === currentPlayerId) ?? null
     : null;
   const isPlayerInRoom = !!currentPlayer;
+  const isSpectator = !!currentSpectatorId;
+  const currentSpectator = currentSpectatorId
+    ? spectators.find((s) => s.id === currentSpectatorId) ?? null
+    : null;
 
   const canJoin =
-    roomStatus === "waiting" && players.length < 4 && !isPlayerInRoom;
+    roomStatus === "waiting" &&
+    players.length < 4 &&
+    !isPlayerInRoom &&
+    !isSpectator;
+  const canWatch = !isPlayerInRoom && !isSpectator;
   const canAddAI =
     roomStatus === "waiting" && players.length < 4 && players.length > 0;
   const canStart =
     players.length === 4 && roomStatus === "waiting" && isPlayerInRoom;
   const canLeave = isPlayerInRoom && roomStatus === "waiting";
+  const canLeaveSpectator = isSpectator;
 
   // Close difficulty menu when clicking outside
   useEffect(() => {
@@ -103,6 +123,19 @@ export function GameLobby({
     const playerName = prompt("Enter your name:");
     if (playerName && playerName.trim()) {
       lobbyMutations.joinRoom.mutate(playerName.trim());
+    }
+  };
+
+  const handleWatchAsSpectator = () => {
+    const spectatorName = prompt("Enter your name to watch:");
+    if (spectatorName && spectatorName.trim()) {
+      spectatorMutations.joinSpectator.mutate(spectatorName.trim());
+    }
+  };
+
+  const handleLeaveSpectator = () => {
+    if (window.confirm("Are you sure you want to stop watching?")) {
+      spectatorMutations.leaveSpectator.mutate();
     }
   };
 
@@ -362,6 +395,44 @@ export function GameLobby({
           </div>
         </div>
 
+        {/* Spectators Section */}
+        {spectators.length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-lg font-semibold mb-3 flex items-center gap-2 text-gray-600">
+              <Eye className="w-5 h-5" />
+              Spectators ({spectators.length})
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              {spectators.map((spectator) => (
+                <div
+                  key={spectator.id}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-sm",
+                    spectator.id === currentSpectatorId
+                      ? "bg-purple-100 text-purple-700 border border-purple-300"
+                      : "bg-gray-100 text-gray-600"
+                  )}
+                >
+                  {spectator.name}
+                  {spectator.id === currentSpectatorId && " (You)"}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Current spectator status */}
+        {currentSpectator && (
+          <div className="mb-6 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+            <div className="flex items-center gap-2 text-purple-700">
+              <Eye className="w-4 h-4" />
+              <span>
+                You are watching as <strong>{currentSpectator.name}</strong>
+              </span>
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-wrap gap-3">
           {canJoin && (
             <button
@@ -372,6 +443,19 @@ export function GameLobby({
               {lobbyMutations.joinRoom.isPending
                 ? "Joining..."
                 : "Join as Player"}
+            </button>
+          )}
+
+          {canWatch && (
+            <button
+              onClick={handleWatchAsSpectator}
+              disabled={spectatorMutations.joinSpectator.isPending}
+              className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 font-semibold flex items-center gap-2"
+            >
+              <Eye className="w-5 h-5" />
+              {spectatorMutations.joinSpectator.isPending
+                ? "Joining..."
+                : "Watch as Spectator"}
             </button>
           )}
 
@@ -408,6 +492,18 @@ export function GameLobby({
               {lobbyMutations.leaveRoom.isPending ? "Leaving..." : "Leave Room"}
             </button>
           )}
+
+          {canLeaveSpectator && (
+            <button
+              onClick={handleLeaveSpectator}
+              disabled={spectatorMutations.leaveSpectator.isPending}
+              className="px-6 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 font-semibold"
+            >
+              {spectatorMutations.leaveSpectator.isPending
+                ? "Leaving..."
+                : "Stop Watching"}
+            </button>
+          )}
         </div>
 
         {lobbyMutations.joinRoom.isError && lobbyMutations.joinRoom.error && (
@@ -434,6 +530,15 @@ export function GameLobby({
               : "Failed to start game"}
           </div>
         )}
+
+        {spectatorMutations.joinSpectator.isError &&
+          spectatorMutations.joinSpectator.error && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
+              {spectatorMutations.joinSpectator.error instanceof Error
+                ? spectatorMutations.joinSpectator.error.message
+                : "Failed to join as spectator"}
+            </div>
+          )}
 
         {realtimeError && (
           <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-700">

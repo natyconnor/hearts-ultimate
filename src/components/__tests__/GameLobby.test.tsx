@@ -38,7 +38,9 @@ describe("GameLobby Component", () => {
   const defaultProps = {
     slug: "test-room-123",
     players: [],
+    spectators: [],
     currentPlayerId: null,
+    currentSpectatorId: null,
     isConnected: true,
     roomStatus: "waiting" as const,
     lobbyMutations: {
@@ -51,6 +53,10 @@ describe("GameLobby Component", () => {
       >(),
       startGame: createMockMutation<unknown, Error, void>(),
       leaveRoom: createMockMutation<unknown, Error, void>(),
+    },
+    spectatorMutations: {
+      joinSpectator: createMockMutation<unknown, Error, string>(),
+      leaveSpectator: createMockMutation<unknown, Error, void>(),
     },
     realtimeError: null,
   };

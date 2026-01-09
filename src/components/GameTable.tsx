@@ -20,6 +20,10 @@ interface GameTableProps {
   cardHandRef?: React.RefObject<HTMLDivElement | null>;
   onCardClick?: (card: CardType, index: number) => void;
   className?: string;
+  /** Whether the viewer is a spectator (not a player) */
+  isSpectating?: boolean;
+  /** For spectators: which player index they're watching from (0-3) */
+  watchingPlayerIndex?: number;
 }
 
 export function GameTable({
@@ -33,12 +37,20 @@ export function GameTable({
   cardHandRef,
   onCardClick,
   className,
+  isSpectating = false,
+  watchingPlayerIndex = 0,
 }: GameTableProps) {
   // Get current player's game index (the player viewing this screen)
-  const myGameIndex = players.findIndex((p) => p.id === currentPlayerId);
+  // For spectators, use the watching player index as their view perspective
+  const playerGameIndex = players.findIndex((p) => p.id === currentPlayerId);
+  const viewingIndex = isSpectating ? watchingPlayerIndex : playerGameIndex;
+
+  // myGameIndex is used for determining who "you" are (affects turn indicators, etc.)
+  // For spectators, they're watching a specific player
+  const myGameIndex = viewingIndex;
 
   // Get player at each visual position (0=bottom/self, 1=left, 2=top, 3=right)
-  // This rotates the view so current player is always at the bottom
+  // This rotates the view so the viewed player is always at the bottom
   const getPlayerAtVisualPosition = (visualPosition: number): Player | null => {
     if (myGameIndex < 0) {
       // Fallback if not found - use absolute positions
@@ -54,10 +66,11 @@ export function GameTable({
     return visualPositionToGameIndex(visualPosition, myGameIndex);
   };
 
-  // Get valid cards for current player (the one viewing the screen)
-  const myPlayer = myGameIndex >= 0 ? players[myGameIndex] : null;
+  // Get valid cards for current player (only for actual players, not spectators)
+  const myPlayer =
+    !isSpectating && playerGameIndex >= 0 ? players[playerGameIndex] : null;
   const validCards =
-    gameState && myPlayer && myGameIndex === gameState.currentPlayerIndex
+    gameState && myPlayer && playerGameIndex === gameState.currentPlayerIndex
       ? getValidCards(
           myPlayer.hand,
           gameState.currentTrick,
@@ -124,7 +137,7 @@ export function GameTable({
 
           {/* Player positions */}
 
-          {/* Bottom Player (Current User) - Full fanned hand */}
+          {/* Bottom Player (Current User or Watched Player for spectators) - Full fanned hand */}
           <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 pb-2 md:pb-4">
             {getPlayerAtVisualPosition(0) && (
               <div className="flex flex-col items-center" ref={cardHandRef}>
@@ -135,15 +148,20 @@ export function GameTable({
                 />
                 <CardHand
                   cards={getPlayerAtVisualPosition(0)?.hand || []}
-                  isFlipped={myGameIndex < 0}
-                  onCardClick={myGameIndex >= 0 ? onCardClick : undefined}
+                  isFlipped={false}
+                  onCardClick={
+                    !isSpectating && playerGameIndex >= 0
+                      ? onCardClick
+                      : undefined
+                  }
                   validCards={
-                    myGameIndex >= 0 &&
-                    gameState?.currentPlayerIndex === myGameIndex
+                    !isSpectating &&
+                    playerGameIndex >= 0 &&
+                    gameState?.currentPlayerIndex === playerGameIndex
                       ? validCards
                       : undefined
                   }
-                  selectedCard={selectedCard}
+                  selectedCard={isSpectating ? null : selectedCard}
                 />
                 <div className="flex flex-col items-center gap-1">
                   <div
@@ -158,9 +176,10 @@ export function GameTable({
                   >
                     {getPlayerAtVisualPosition(0)?.name}
                     {getPlayerAtVisualPosition(0)?.isAI && " 🤖"}
-                    {myGameIndex >= 0 && " (You)"}
+                    {!isSpectating && playerGameIndex >= 0 && " (You)"}
+                    {isSpectating && " (Watching)"}
                     {gameState?.currentPlayerIndex === myGameIndex &&
-                      " - Your Turn"}
+                      (isSpectating ? " - Their Turn" : " - Your Turn")}
                     {gameState?.trickLeaderIndex === myGameIndex &&
                       gameState?.currentPlayerIndex !== myGameIndex &&
                       " 👑"}
@@ -189,6 +208,7 @@ export function GameTable({
               playerIndex={getGameIndexForVisualPosition(2)}
               gameState={gameState}
               position="top"
+              showCards={isSpectating}
             />
           )}
 
@@ -199,6 +219,7 @@ export function GameTable({
               playerIndex={getGameIndexForVisualPosition(1)}
               gameState={gameState}
               position="left"
+              showCards={isSpectating}
             />
           )}
 
@@ -209,6 +230,7 @@ export function GameTable({
               playerIndex={getGameIndexForVisualPosition(3)}
               gameState={gameState}
               position="right"
+              showCards={isSpectating}
             />
           )}
         </motion.div>

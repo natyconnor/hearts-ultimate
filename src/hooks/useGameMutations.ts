@@ -4,6 +4,8 @@ import {
   updateRoomGameState,
   updateRoomStatus,
   deleteRoom,
+  joinAsSpectator,
+  leaveAsSpectator,
 } from "../lib/roomApi";
 import { createAIPlayersToFillSlots } from "../lib/aiPlayers";
 import { createAndDeal } from "../game/deck";
@@ -29,7 +31,7 @@ import {
 import { useAIDebugStore } from "../store/aiDebugStore";
 import { playSound } from "../lib/sounds";
 import { STORAGE_KEYS } from "../lib/constants";
-import type { GameState, Player, Card, AIDifficulty } from "../types/game";
+import type { GameState, Player, Card, AIDifficulty, Spectator } from "../types/game";
 
 interface RoomData {
   id: string;
@@ -575,5 +577,72 @@ export function useGameplayMutations({
     submitPass,
     completeReveal,
     newGame,
+  };
+}
+
+interface UseSpectatorMutationsParams {
+  slug: string | undefined;
+  spectatorId: string | null;
+  setSpectatorId: (id: string | null) => void;
+  setSpectators: (spectators: Spectator[]) => void;
+}
+
+export function useSpectatorMutations({
+  slug,
+  spectatorId,
+  setSpectatorId,
+  setSpectators,
+}: UseSpectatorMutationsParams) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const joinSpectator = useMutation({
+    mutationFn: async (spectatorName: string) => {
+      if (!slug) throw new Error("Room not found");
+
+      const newSpectatorId = `spectator-${Date.now()}-${Math.random()
+        .toString(36)
+        .substring(2, 9)}`;
+      const spectator: Spectator = {
+        id: newSpectatorId,
+        name: spectatorName,
+      };
+
+      const updatedSpectators = await joinAsSpectator(slug, spectator);
+
+      localStorage.setItem(STORAGE_KEYS.SPECTATOR_ID, newSpectatorId);
+      localStorage.setItem(STORAGE_KEYS.SPECTATOR_NAME, spectatorName);
+      setSpectatorId(newSpectatorId);
+
+      return updatedSpectators;
+    },
+    onSuccess: (updatedSpectators) => {
+      setSpectators(updatedSpectators);
+      queryClient.invalidateQueries({ queryKey: ["room", slug] });
+    },
+  });
+
+  const leaveSpectator = useMutation({
+    mutationFn: async () => {
+      if (!slug || !spectatorId) throw new Error("Not spectating");
+
+      const updatedSpectators = await leaveAsSpectator(slug, spectatorId);
+
+      localStorage.removeItem(STORAGE_KEYS.SPECTATOR_ID);
+      localStorage.removeItem(STORAGE_KEYS.SPECTATOR_NAME);
+      setSpectatorId(null);
+
+      return updatedSpectators;
+    },
+    onSuccess: (updatedSpectators) => {
+      setSpectators(updatedSpectators);
+      queryClient.invalidateQueries({ queryKey: ["room", slug] });
+      navigate("/");
+    },
+  });
+
+  return {
+    joinSpectator,
+    leaveSpectator,
   };
 }
