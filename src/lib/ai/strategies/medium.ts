@@ -15,15 +15,15 @@ import type {
   PassContext,
   ScoredCard,
 } from "../types";
+import { AI_VERSION } from "../types";
 import {
   RANK,
   THRESHOLDS,
   PASS_SCORES,
   LEAD_SCORES,
-  AI_VERSION,
   FOLLOW_SCORES,
   DUMP_SCORES,
-} from "../types";
+} from "../constants";
 import { isQueenOfSpades, isHeart } from "../../../game/rules";
 import { scoreCardsForPassing } from "../utils/cardScoring";
 import {

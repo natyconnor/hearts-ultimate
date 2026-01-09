@@ -7,7 +7,8 @@
 
 import type { Card } from "../../../types/game";
 import type { AIStrategy, PlayContext, PassContext } from "../types";
-import { RANK, PASS_SCORES, AI_VERSION } from "../types";
+import { AI_VERSION } from "../types";
+import { RANK, PASS_SCORES } from "../constants";
 import { isQueenOfSpades } from "../../../game/rules";
 import { useAIDebugStore } from "../../../store/aiDebugStore";
 

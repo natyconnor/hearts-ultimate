@@ -7,7 +7,7 @@ import { detectMoonShooter } from "../strategies/hard/moonDetection";
 import { CardMemory } from "../memory/cardMemory";
 import type { GameState, Card } from "../../../types/game";
 import type { AIConfig } from "../types";
-import { DEFAULT_AI_CONFIG } from "../types";
+import { DEFAULT_AI_CONFIG } from "../constants";
 
 // Helper to create cards quickly
 const card = (suit: Card["suit"], rank: Card["rank"]): Card => ({

@@ -47,3 +47,14 @@ export function getHighestRankInTrick(
 export function isLastToPlay(trickLength: number): boolean {
   return trickLength === 3; // 0, 1, 2 already played, we're #3
 }
+
+/**
+ * Check if Q♠ is in the current trick
+ */
+export function isQueenOfSpadesInTrick(
+  currentTrickCards: Array<{ playerId: string; card: Card }>
+): boolean {
+  return currentTrickCards.some(
+    (play) => play.card.suit === "spades" && play.card.rank === 12
+  );
+}

@@ -7,7 +7,7 @@
 
 import type { Card } from "../../../types/game";
 import type { ScoredCard } from "../types";
-import { RANK, THRESHOLDS, PASS_SCORES } from "../types";
+import { RANK, THRESHOLDS, PASS_SCORES } from "../constants";
 import { isQueenOfSpades } from "../../../game/rules";
 import { getSuitDistribution, hasProtectedHighCards } from "./suitAnalysis";
 
