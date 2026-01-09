@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Copy, Check } from "lucide-react";
 import { SoundSettings } from "./SoundSettings";
 import { cn } from "../lib/utils";
 import { getDifficultyDisplayName } from "../lib/aiPlayers";
@@ -67,6 +67,7 @@ export function GameLobby({
   const [openDifficultyMenu, setOpenDifficultyMenu] = useState<string | null>(
     null
   );
+  const [copied, setCopied] = useState(false);
 
   const currentPlayer = currentPlayerId
     ? players.find((p) => p.id === currentPlayerId) ?? null
@@ -134,6 +135,30 @@ export function GameLobby({
     }
   };
 
+  const handleCopySlug = async () => {
+    try {
+      await navigator.clipboard.writeText(slug);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback for older browsers
+      const textArea = document.createElement("textarea");
+      textArea.value = slug;
+      textArea.style.position = "fixed";
+      textArea.style.opacity = "0";
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand("copy");
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (fallbackErr) {
+        console.error("Failed to copy:", fallbackErr);
+      }
+      document.body.removeChild(textArea);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-poker-green via-green-800 to-poker-green flex items-center justify-center p-4 relative">
       {/* Sound Settings - Top Left */}
@@ -157,8 +182,34 @@ export function GameLobby({
 
         <div className="mb-6">
           <div className="text-sm text-gray-500 mb-2">Room Code</div>
-          <div className="text-2xl font-mono font-bold text-poker-green bg-gray-100 p-3 rounded-lg">
-            {slug}
+          <div className="flex items-center gap-2">
+            <div className="flex-1 text-2xl font-mono font-bold text-poker-green bg-gray-100 p-3 rounded-lg">
+              {slug}
+            </div>
+            <button
+              onClick={handleCopySlug}
+              className={cn(
+                "px-4 py-3 rounded-lg",
+                "bg-poker-green hover:bg-green-800",
+                "text-white transition-colors",
+                "flex items-center gap-2",
+                "font-medium",
+                copied && "bg-green-600"
+              )}
+              title="Copy room code"
+            >
+              {copied ? (
+                <>
+                  <Check className="w-5 h-5" />
+                  <span className="text-sm">Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-5 h-5" />
+                  <span className="text-sm">Copy</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
 
@@ -354,9 +405,7 @@ export function GameLobby({
               disabled={lobbyMutations.leaveRoom.isPending}
               className="px-6 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 font-semibold"
             >
-              {lobbyMutations.leaveRoom.isPending
-                ? "Leaving..."
-                : "Leave Room"}
+              {lobbyMutations.leaveRoom.isPending ? "Leaving..." : "Leave Room"}
             </button>
           )}
         </div>
@@ -378,14 +427,13 @@ export function GameLobby({
             </div>
           )}
 
-        {lobbyMutations.startGame.isError &&
-          lobbyMutations.startGame.error && (
-            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
-              {lobbyMutations.startGame.error instanceof Error
-                ? lobbyMutations.startGame.error.message
-                : "Failed to start game"}
-            </div>
-          )}
+        {lobbyMutations.startGame.isError && lobbyMutations.startGame.error && (
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
+            {lobbyMutations.startGame.error instanceof Error
+              ? lobbyMutations.startGame.error.message
+              : "Failed to start game"}
+          </div>
+        )}
 
         {realtimeError && (
           <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-700">

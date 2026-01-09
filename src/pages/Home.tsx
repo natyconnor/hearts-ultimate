@@ -7,6 +7,7 @@ import { generateSlug } from "../lib/slugGenerator";
 import type { AIDifficulty, GameState } from "../types/game";
 import {
   createRoom,
+  getRoomBySlug,
   updateRoomGameState,
   updateRoomStatus,
 } from "../lib/roomApi";
@@ -127,9 +128,38 @@ export function Home() {
     },
   });
 
+  const joinRoomMutation = useMutation({
+    mutationFn: async (slug: string) => {
+      setLoading(true);
+      setError(null);
+      const room = await getRoomBySlug(slug);
+      if (!room) {
+        throw new Error("Room not found");
+      }
+      return room;
+    },
+    onSuccess: (room) => {
+      setCurrentRoom({
+        roomId: room.id,
+        slug: room.slug,
+        status: room.status,
+      });
+      setLoading(false);
+      navigate(`/room/${room.slug}`);
+    },
+    onError: (error: Error) => {
+      setLoading(false);
+      setError(error.message);
+    },
+  });
+
   const handleCreateGame = () => {
     const slug = generateSlug();
     createRoomMutation.mutate(slug);
+  };
+
+  const handleJoinRoom = (slug: string) => {
+    joinRoomMutation.mutate(slug);
   };
 
   const createTestRoomMutation = useMutation({
@@ -366,9 +396,11 @@ export function Home() {
         <CreateGameSection
           onCreateGame={handleCreateGame}
           onCreateTestRoom={handleCreateTestRoom}
+          onJoinRoom={handleJoinRoom}
           isCreatingRoom={createRoomMutation.isPending}
           isCreatingTestRoom={createTestRoomMutation.isPending}
-          error={createRoomMutation.error}
+          isJoiningRoom={joinRoomMutation.isPending}
+          error={createRoomMutation.error || joinRoomMutation.error}
         />
 
         {/* Decorative card suits at bottom */}

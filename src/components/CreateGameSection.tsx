@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, LogIn } from "lucide-react";
 import { cn } from "../lib/utils";
 import type { AIDifficulty } from "../types/game";
 
@@ -20,22 +20,28 @@ const TEST_DIFFICULTY_OPTIONS: {
 interface CreateGameSectionProps {
   onCreateGame: () => void;
   onCreateTestRoom: (difficulty: TestDifficulty) => void;
+  onJoinRoom: (slug: string) => void;
   isCreatingRoom: boolean;
   isCreatingTestRoom: boolean;
+  isJoiningRoom: boolean;
   error: Error | null;
 }
 
 export function CreateGameSection({
   onCreateGame,
   onCreateTestRoom,
+  onJoinRoom,
   isCreatingRoom,
   isCreatingTestRoom,
+  isJoiningRoom,
   error,
 }: CreateGameSectionProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [testDifficulty, setTestDifficulty] =
     useState<TestDifficulty>("medium");
   const [showTestDifficultyMenu, setShowTestDifficultyMenu] = useState(false);
+  const [showJoinInput, setShowJoinInput] = useState(false);
+  const [joinSlug, setJoinSlug] = useState("");
 
   // Close test difficulty menu when clicking outside
   useEffect(() => {
@@ -58,6 +64,24 @@ export function CreateGameSection({
     onCreateTestRoom(testDifficulty);
   };
 
+  const handleJoinRoom = () => {
+    const trimmedSlug = joinSlug.trim();
+    if (trimmedSlug) {
+      onJoinRoom(trimmedSlug);
+      setJoinSlug("");
+      setShowJoinInput(false);
+    }
+  };
+
+  const handleJoinKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleJoinRoom();
+    } else if (e.key === "Escape") {
+      setShowJoinInput(false);
+      setJoinSlug("");
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
@@ -65,54 +89,169 @@ export function CreateGameSection({
       transition={{ duration: 0.5, delay: 0.5 }}
       className="flex flex-col gap-4 items-center"
     >
-      <motion.button
-        onClick={onCreateGame}
-        disabled={isCreatingRoom}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
-        className={cn(
-          "relative group px-10 py-4",
-          "font-bold text-lg text-white",
-          "bg-gradient-to-r from-emerald-600 to-emerald-500",
-          "hover:from-emerald-500 hover:to-emerald-400",
-          "rounded-2xl border border-emerald-400/30",
-          "shadow-2xl shadow-emerald-900/50",
-          "transition-all duration-300 cursor-pointer",
-          "disabled:opacity-50 disabled:cursor-not-allowed"
-        )}
-      >
-        {/* Button glow effect */}
-        <motion.div
-          animate={{ opacity: isHovered ? 0.5 : 0 }}
-          className="absolute inset-0 rounded-2xl bg-emerald-400/20 blur-xl"
-        />
-
-        {/* Button content */}
-        <span className="relative flex items-center gap-3">
-          {isCreatingRoom ? (
-            <>
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{
-                  duration: 1,
-                  repeat: Infinity,
-                  ease: "linear",
-                }}
-                className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
-              />
-              Creating Room...
-            </>
-          ) : (
-            <>
-              <span className="text-xl">♠</span>
-              Create Game
-              <span className="text-xl">♥</span>
-            </>
+      <div className="flex flex-col sm:flex-row gap-3 items-center">
+        <motion.button
+          onClick={onCreateGame}
+          disabled={isCreatingRoom || isJoiningRoom}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className={cn(
+            "relative group px-10 py-4",
+            "font-bold text-lg text-white",
+            "bg-gradient-to-r from-emerald-600 to-emerald-500",
+            "hover:from-emerald-500 hover:to-emerald-400",
+            "rounded-2xl border border-emerald-400/30",
+            "shadow-2xl shadow-emerald-900/50",
+            "transition-all duration-300 cursor-pointer",
+            "disabled:opacity-50 disabled:cursor-not-allowed"
           )}
-        </span>
-      </motion.button>
+        >
+          {/* Button glow effect */}
+          <motion.div
+            animate={{ opacity: isHovered ? 0.5 : 0 }}
+            className="absolute inset-0 rounded-2xl bg-emerald-400/20 blur-xl"
+          />
+
+          {/* Button content */}
+          <span className="relative flex items-center gap-3">
+            {isCreatingRoom ? (
+              <>
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{
+                    duration: 1,
+                    repeat: Infinity,
+                    ease: "linear",
+                  }}
+                  className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
+                />
+                Creating Room...
+              </>
+            ) : (
+              <>
+                <span className="text-xl">♠</span>
+                Create Game
+                <span className="text-xl">♥</span>
+              </>
+            )}
+          </span>
+        </motion.button>
+
+        {/* Join Room Button/Input */}
+        <AnimatePresence mode="wait">
+          {!showJoinInput ? (
+            <motion.button
+              key="join-button"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              onClick={() => setShowJoinInput(true)}
+              disabled={isJoiningRoom || isCreatingRoom}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className={cn(
+                "relative group px-6 py-4",
+                "font-bold text-lg text-white",
+                "bg-gradient-to-r from-blue-600 to-blue-500",
+                "hover:from-blue-500 hover:to-blue-400",
+                "rounded-2xl border border-blue-400/30",
+                "shadow-2xl shadow-blue-900/50",
+                "transition-all duration-300 cursor-pointer",
+                "disabled:opacity-50 disabled:cursor-not-allowed",
+                "flex items-center gap-2"
+              )}
+            >
+              <LogIn className="w-5 h-5" />
+              Join Room
+            </motion.button>
+          ) : (
+            <motion.div
+              key="join-input"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="flex gap-2 items-center"
+            >
+              <input
+                type="text"
+                value={joinSlug}
+                onChange={(e) => setJoinSlug(e.target.value)}
+                onKeyDown={handleJoinKeyPress}
+                placeholder="Enter room code"
+                autoFocus
+                disabled={isJoiningRoom}
+                className={cn(
+                  "px-4 py-4",
+                  "font-mono text-lg text-white",
+                  "bg-white/10 backdrop-blur-sm",
+                  "border border-white/20 rounded-2xl",
+                  "focus:outline-none focus:ring-2 focus:ring-blue-400/50",
+                  "focus:border-blue-400/50",
+                  "placeholder:text-white/40",
+                  "disabled:opacity-50 disabled:cursor-not-allowed",
+                  "w-48 sm:w-56"
+                )}
+              />
+              <motion.button
+                onClick={handleJoinRoom}
+                disabled={isJoiningRoom || !joinSlug.trim()}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className={cn(
+                  "px-6 py-4",
+                  "font-bold text-lg text-white",
+                  "bg-gradient-to-r from-blue-600 to-blue-500",
+                  "hover:from-blue-500 hover:to-blue-400",
+                  "rounded-2xl border border-blue-400/30",
+                  "shadow-xl shadow-blue-900/50",
+                  "transition-all duration-200",
+                  "disabled:opacity-50 disabled:cursor-not-allowed",
+                  "flex items-center gap-2"
+                )}
+              >
+                {isJoiningRoom ? (
+                  <>
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{
+                        duration: 1,
+                        repeat: Infinity,
+                        ease: "linear",
+                      }}
+                      className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
+                    />
+                    Joining...
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="w-5 h-5" />
+                    Join
+                  </>
+                )}
+              </motion.button>
+              <button
+                onClick={() => {
+                  setShowJoinInput(false);
+                  setJoinSlug("");
+                }}
+                disabled={isJoiningRoom}
+                className={cn(
+                  "px-4 py-4",
+                  "text-white/80 hover:text-white",
+                  "bg-white/5 hover:bg-white/10",
+                  "rounded-2xl border border-white/10 hover:border-white/20",
+                  "transition-all duration-200",
+                  "disabled:opacity-50 disabled:cursor-not-allowed"
+                )}
+              >
+                ✕
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       {/* Test Room section */}
       <div className="flex flex-col gap-2 items-center">
@@ -139,12 +278,14 @@ export function CreateGameSection({
               AI Level:{" "}
               <span className="text-emerald-400">
                 {
-                  TEST_DIFFICULTY_OPTIONS.find((d) => d.value === testDifficulty)
-                    ?.icon
+                  TEST_DIFFICULTY_OPTIONS.find(
+                    (d) => d.value === testDifficulty
+                  )?.icon
                 }{" "}
                 {
-                  TEST_DIFFICULTY_OPTIONS.find((d) => d.value === testDifficulty)
-                    ?.label
+                  TEST_DIFFICULTY_OPTIONS.find(
+                    (d) => d.value === testDifficulty
+                  )?.label
                 }
               </span>
             </span>
