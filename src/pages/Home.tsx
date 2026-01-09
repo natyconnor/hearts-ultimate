@@ -100,7 +100,12 @@ export function Home() {
   const [_testDifficulty, setTestDifficulty] =
     useState<TestDifficulty>("medium");
 
+  // Clear any stale room/spectator data when arriving at Home
   useEffect(() => {
+    // Always clear spectator data - spectators should start fresh for new rooms
+    localStorage.removeItem(STORAGE_KEYS.SPECTATOR_ID);
+    localStorage.removeItem(STORAGE_KEYS.SPECTATOR_NAME);
+
     const storedPlayerId = localStorage.getItem(STORAGE_KEYS.PLAYER_ID);
     if (!storedPlayerId) {
       clearCurrentRoom();
