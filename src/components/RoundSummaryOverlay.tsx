@@ -1,8 +1,9 @@
 import { motion } from "framer-motion";
 import { ChevronRight, Moon, Heart, Sparkles, Star } from "lucide-react";
-import type { Player, Card, AIDifficulty } from "../types/game";
+import type { Player, Card } from "../types/game";
 import { Card as CardComponent } from "./Card";
 import { cn } from "../lib/utils";
+import { DifficultyBadgeIcon } from "./DifficultyBadge";
 import {
   getScoreColor,
   getProgressBarColor,
@@ -46,29 +47,6 @@ export function RoundSummaryOverlay({
       return () => clearTimeout(timer);
     }
   }, [shotTheMoon]);
-
-  // Helper function to get difficulty badge info
-  const getDifficultyBadge = (difficulty: AIDifficulty | undefined) => {
-    if (!difficulty) return null;
-    const badges = {
-      easy: {
-        icon: "🌱",
-        label: "Easy",
-        color: "bg-green-500/20 border-green-500/40 text-green-200",
-      },
-      medium: {
-        icon: "⚡",
-        label: "Medium",
-        color: "bg-yellow-500/20 border-yellow-500/40 text-yellow-200",
-      },
-      hard: {
-        icon: "🧠",
-        label: "Hard",
-        color: "bg-purple-500/20 border-purple-500/40 text-purple-200",
-      },
-    };
-    return badges[difficulty];
-  };
 
   return (
     <motion.div
@@ -158,19 +136,7 @@ export function RoundSummaryOverlay({
                     {player.isAI && (
                       <>
                         <span className="text-white/50 text-xs">🤖</span>
-                        {getDifficultyBadge(player.difficulty) && (
-                          <div
-                            className={cn(
-                              "flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium backdrop-blur-sm border",
-                              getDifficultyBadge(player.difficulty)?.color
-                            )}
-                            title={getDifficultyBadge(player.difficulty)?.label}
-                          >
-                            <span>
-                              {getDifficultyBadge(player.difficulty)?.icon}
-                            </span>
-                          </div>
-                        )}
+                        <DifficultyBadgeIcon difficulty={player.difficulty} />
                       </>
                     )}
                   </div>
@@ -232,21 +198,9 @@ export function RoundSummaryOverlay({
                         {player.isAI && (
                           <>
                             <span className="text-white/50 text-xs">🤖</span>
-                            {getDifficultyBadge(player.difficulty) && (
-                              <div
-                                className={cn(
-                                  "flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium backdrop-blur-sm border",
-                                  getDifficultyBadge(player.difficulty)?.color
-                                )}
-                                title={
-                                  getDifficultyBadge(player.difficulty)?.label
-                                }
-                              >
-                                <span>
-                                  {getDifficultyBadge(player.difficulty)?.icon}
-                                </span>
-                              </div>
-                            )}
+                            <DifficultyBadgeIcon
+                              difficulty={player.difficulty}
+                            />
                           </>
                         )}
                       </div>

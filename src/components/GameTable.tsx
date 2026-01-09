@@ -1,20 +1,12 @@
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { CardHand } from "./CardHand";
-import { Card } from "./Card";
-import type {
-  Card as CardType,
-  Player,
-  GameState,
-  AIDifficulty,
-} from "../types/game";
+import type { Card as CardType, Player, GameState } from "../types/game";
 import { cn } from "../lib/utils";
-import { getValidCards, isFirstTrick, isTwoOfClubs } from "../game/rules";
-import {
-  getTrickCardPosition,
-  getPlayerStartPosition,
-  getWinnerPosition,
-} from "../game/cardDisplay";
-import { Heart, Info } from "lucide-react";
+import { getValidCards, isFirstTrick } from "../game/rules";
+import { DifficultyBadge } from "./DifficultyBadge";
+import { TrickArea } from "./TrickArea";
+import { GameIndicators } from "./GameIndicators";
+import { OpponentHand } from "./OpponentHand";
 
 interface GameTableProps {
   players: Player[];
@@ -64,29 +56,6 @@ export function GameTable({
         )
       : [];
 
-  // Helper function to get difficulty badge info
-  const getDifficultyBadge = (difficulty: AIDifficulty | undefined) => {
-    if (!difficulty) return null;
-    const badges = {
-      easy: {
-        icon: "🌱",
-        label: "Easy",
-        color: "bg-green-500/20 border-green-500/40 text-green-200",
-      },
-      medium: {
-        icon: "⚡",
-        label: "Medium",
-        color: "bg-yellow-500/20 border-yellow-500/40 text-yellow-200",
-      },
-      hard: {
-        icon: "🧠",
-        label: "Hard",
-        color: "bg-purple-500/20 border-purple-500/40 text-purple-200",
-      },
-    };
-    return badges[difficulty];
-  };
-
   // Determine which trick to display (current or last completed)
   const displayTrick =
     showCompletedTrick && gameState?.lastCompletedTrick
@@ -134,113 +103,14 @@ export function GameTable({
           */}
 
           {/* Center area for current trick */}
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-            {/* Winner announcement - positioned absolutely above cards */}
-            {isShowingCompletedTrick &&
-              gameState?.lastTrickWinnerIndex !== undefined && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="absolute top-[-120px] left-1/2 transform -translate-x-1/2 bg-green-500/90 text-white text-sm font-bold px-4 py-1.5 rounded-full shadow-lg z-20 whitespace-nowrap"
-                >
-                  🏆{" "}
-                  {gameState.lastTrickWinnerIndex === currentPlayerIndex
-                    ? "You win!"
-                    : `${players[gameState.lastTrickWinnerIndex]?.name} wins!`}
-                </motion.div>
-              )}
-            <div className="flex flex-col gap-2 items-center justify-center min-w-[280px] min-h-[200px]">
-              <div className="relative w-[220px] h-[200px]">
-                {displayTrick.map((trickCard) => {
-                  const trickPlayerIndex = players.findIndex(
-                    (p) => p.id === trickCard.playerId
-                  );
-
-                  // Check if this card is the winning card
-                  const isWinning =
-                    isShowingCompletedTrick &&
-                    gameState?.lastTrickWinnerIndex === trickPlayerIndex;
-
-                  // Position card based on which player played it
-                  const cardPos = getTrickCardPosition(trickPlayerIndex);
-                  const startPos = getPlayerStartPosition(trickPlayerIndex);
-
-                  // If animating to winner, calculate final position
-                  const winnerPos =
-                    animatingToWinner &&
-                    gameState?.lastTrickWinnerIndex !== undefined
-                      ? getWinnerPosition(gameState.lastTrickWinnerIndex)
-                      : null;
-
-                  return (
-                    <motion.div
-                      key={`trick-${trickCard.playerId}-${trickCard.card.suit}-${trickCard.card.rank}`}
-                      className={cn(
-                        "absolute left-1/2 top-1/2",
-                        isWinning &&
-                          !animatingToWinner &&
-                          "ring-4 ring-green-400 rounded-xl z-50"
-                      )}
-                      style={{
-                        marginLeft: -48, // Half of card width
-                        marginTop: -72, // Half of card height
-                      }}
-                      initial={{
-                        x: startPos.x,
-                        y: startPos.y,
-                        scale: 0.5,
-                        opacity: 0,
-                        rotate: -90,
-                      }}
-                      animate={
-                        animatingToWinner && winnerPos
-                          ? {
-                              x: winnerPos.x,
-                              y: winnerPos.y,
-                              scale: 0,
-                              opacity: 0,
-                              rotate: 0,
-                            }
-                          : isWinning
-                          ? {
-                              x: cardPos.x,
-                              y: cardPos.y,
-                              scale: 1.15,
-                              opacity: 1,
-                              rotate: 0,
-                            }
-                          : {
-                              x: cardPos.x,
-                              y: cardPos.y,
-                              scale: 1,
-                              opacity: 1,
-                              rotate: 0,
-                            }
-                      }
-                      transition={
-                        animatingToWinner
-                          ? {
-                              type: "tween",
-                              duration: 0.3,
-                              ease: "easeInOut",
-                            }
-                          : {
-                              type: "spring",
-                              stiffness: 200,
-                              damping: 25,
-                            }
-                      }
-                    >
-                      <Card
-                        suit={trickCard.card.suit}
-                        rank={trickCard.card.rank}
-                      />
-                    </motion.div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+          <TrickArea
+            displayTrick={displayTrick}
+            players={players}
+            gameState={gameState}
+            currentPlayerIndex={currentPlayerIndex}
+            isShowingCompletedTrick={isShowingCompletedTrick ?? false}
+            animatingToWinner={animatingToWinner ?? false}
+          />
 
           {/* Player positions */}
 
@@ -249,82 +119,10 @@ export function GameTable({
             {getPlayerAtPosition(0) && (
               <div className="flex flex-col items-center" ref={cardHandRef}>
                 {/* Badges above player's hand */}
-                <div className="mb-2 flex flex-col items-center gap-1.5 z-30">
-                  {/* Hearts Broken Indicator */}
-                  <AnimatePresence>
-                    {gameState?.heartsBroken && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0, y: -10 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0 }}
-                      >
-                        <motion.div
-                          animate={{
-                            scale: [1, 1.05, 1],
-                          }}
-                          transition={{
-                            duration: 2,
-                            repeat: Infinity,
-                            ease: "easeInOut",
-                          }}
-                          className="flex items-center gap-2 px-3 py-1.5 bg-red-500/20 backdrop-blur-sm rounded-full border border-red-500/40 shadow-lg shadow-red-500/20"
-                        >
-                          <motion.div
-                            animate={{
-                              scale: [1, 1.2, 1],
-                            }}
-                            transition={{
-                              duration: 0.8,
-                              repeat: Infinity,
-                              ease: "easeInOut",
-                            }}
-                          >
-                            <Heart className="w-4 h-4 text-red-500 fill-red-500" />
-                          </motion.div>
-                          <span className="text-red-200 font-semibold text-xs tracking-wide">
-                            Hearts Broken
-                          </span>
-                          <motion.div
-                            animate={{
-                              scale: [1, 1.2, 1],
-                            }}
-                            transition={{
-                              duration: 0.8,
-                              repeat: Infinity,
-                              ease: "easeInOut",
-                              delay: 0.4,
-                            }}
-                          >
-                            <Heart className="w-4 h-4 text-red-500 fill-red-500" />
-                          </motion.div>
-                        </motion.div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  {/* No Pass Round Indicator - First Trick */}
-                  <AnimatePresence>
-                    {gameState &&
-                      gameState.passDirection === "none" &&
-                      isFirstTrick(gameState) && (
-                        <motion.div
-                          initial={{ opacity: 0, scale: 0, y: -10 }}
-                          animate={{ opacity: 1, scale: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0 }}
-                        >
-                          <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/20 backdrop-blur-sm rounded-full border border-blue-500/40 shadow-lg shadow-blue-500/20">
-                            <Info className="w-4 h-4 text-blue-300" />
-                            <span className="text-blue-200 font-semibold text-xs tracking-wide whitespace-nowrap">
-                              No Pass Round
-                              {getPlayerAtPosition(0)?.hand.some(
-                                isTwoOfClubs
-                              ) && " - Play 2♣ to start"}
-                            </span>
-                          </div>
-                        </motion.div>
-                      )}
-                  </AnimatePresence>
-                </div>
+                <GameIndicators
+                  gameState={gameState}
+                  playerHand={getPlayerAtPosition(0)?.hand || []}
+                />
                 <CardHand
                   cards={getPlayerAtPosition(0)?.hand || []}
                   isFlipped={currentPlayerIndex !== 0}
@@ -358,31 +156,12 @@ export function GameTable({
                       gameState?.currentPlayerIndex !== 0 &&
                       " 👑"}
                   </div>
-                  {getPlayerAtPosition(0)?.isAI &&
-                    getDifficultyBadge(getPlayerAtPosition(0)?.difficulty) && (
-                      <div
-                        className={cn(
-                          "flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium backdrop-blur-sm border shadow-lg",
-                          getDifficultyBadge(getPlayerAtPosition(0)?.difficulty)
-                            ?.color
-                        )}
-                      >
-                        <span>
-                          {
-                            getDifficultyBadge(
-                              getPlayerAtPosition(0)?.difficulty
-                            )?.icon
-                          }
-                        </span>
-                        <span>
-                          {
-                            getDifficultyBadge(
-                              getPlayerAtPosition(0)?.difficulty
-                            )?.label
-                          }
-                        </span>
-                      </div>
-                    )}
+                  {getPlayerAtPosition(0)?.isAI && (
+                    <DifficultyBadge
+                      difficulty={getPlayerAtPosition(0)?.difficulty}
+                      size="md"
+                    />
+                  )}
                 </div>
                 {gameState && (
                   <div className="text-white/80 text-xs mt-1">
@@ -395,229 +174,34 @@ export function GameTable({
           </div>
 
           {/* Top Player - Compact stacked cards */}
-          <div className="absolute top-2 md:top-4 left-1/2 transform -translate-x-1/2">
-            {getPlayerAtPosition(2) && (
-              <div className="flex flex-col items-center gap-1 md:gap-2">
-                <div className="flex flex-col items-center gap-1">
-                  <div
-                    className={cn(
-                      "text-white font-semibold text-xs md:text-sm px-2 md:px-3 py-0.5 md:py-1 rounded-full transition-all",
-                      gameState?.currentPlayerIndex === 2
-                        ? "bg-yellow-500/80 shadow-[0_0_12px_rgba(234,179,8,0.6)]"
-                        : gameState?.trickLeaderIndex === 2
-                        ? "bg-emerald-500/80 shadow-[0_0_12px_rgba(16,185,129,0.6)]"
-                        : "bg-black/30"
-                    )}
-                  >
-                    {getPlayerAtPosition(2)?.name}
-                    {getPlayerAtPosition(2)?.isAI && " 🤖"}
-                    {gameState?.trickLeaderIndex === 2 &&
-                      gameState?.currentPlayerIndex !== 2 &&
-                      " 👑"}
-                  </div>
-                  {getPlayerAtPosition(2)?.isAI &&
-                    getDifficultyBadge(getPlayerAtPosition(2)?.difficulty) && (
-                      <div
-                        className={cn(
-                          "flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium backdrop-blur-sm border shadow-lg",
-                          getDifficultyBadge(getPlayerAtPosition(2)?.difficulty)
-                            ?.color
-                        )}
-                      >
-                        <span>
-                          {
-                            getDifficultyBadge(
-                              getPlayerAtPosition(2)?.difficulty
-                            )?.icon
-                          }
-                        </span>
-                        <span>
-                          {
-                            getDifficultyBadge(
-                              getPlayerAtPosition(2)?.difficulty
-                            )?.label
-                          }
-                        </span>
-                      </div>
-                    )}
-                </div>
-                {gameState && (
-                  <div className="text-white/70 text-xs mt-0.5">
-                    Score: {gameState.scores[2]} | Round:{" "}
-                    {gameState.roundScores[2]}
-                  </div>
-                )}
-                <div className="flex -space-x-8 md:-space-x-12">
-                  {getPlayerAtPosition(2)?.hand.map((card, idx) => (
-                    <motion.div
-                      key={`top-${idx}`}
-                      initial={{ opacity: 0, y: -20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: idx * 0.03 }}
-                      style={{ zIndex: idx }}
-                    >
-                      <Card
-                        suit={card.suit}
-                        rank={card.rank}
-                        isFlipped={true}
-                        className="w-12 h-16 md:w-14 md:h-20"
-                      />
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          {getPlayerAtPosition(2) && (
+            <OpponentHand
+              player={getPlayerAtPosition(2)!}
+              playerIndex={2}
+              gameState={gameState}
+              position="top"
+            />
+          )}
 
           {/* Left Player (Player 1 - clockwise from bottom) - Vertical stacked cards */}
-          <div className="absolute left-2 md:left-4 top-1/2 transform -translate-y-1/2">
-            {getPlayerAtPosition(1) && (
-              <div className="flex flex-col items-center gap-1 md:gap-2">
-                <div className="flex flex-col items-center gap-1">
-                  <div
-                    className={cn(
-                      "text-white font-semibold text-xs md:text-sm px-2 md:px-3 py-0.5 md:py-1 rounded-full whitespace-nowrap transition-all",
-                      gameState?.currentPlayerIndex === 1
-                        ? "bg-yellow-500/80 shadow-[0_0_12px_rgba(234,179,8,0.6)]"
-                        : gameState?.trickLeaderIndex === 1
-                        ? "bg-emerald-500/80 shadow-[0_0_12px_rgba(16,185,129,0.6)]"
-                        : "bg-black/30"
-                    )}
-                  >
-                    {getPlayerAtPosition(1)?.name}
-                    {getPlayerAtPosition(1)?.isAI && " 🤖"}
-                    {gameState?.trickLeaderIndex === 1 &&
-                      gameState?.currentPlayerIndex !== 1 &&
-                      " 👑"}
-                  </div>
-                  {getPlayerAtPosition(1)?.isAI &&
-                    getDifficultyBadge(getPlayerAtPosition(1)?.difficulty) && (
-                      <div
-                        className={cn(
-                          "flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium backdrop-blur-sm border shadow-lg",
-                          getDifficultyBadge(getPlayerAtPosition(1)?.difficulty)
-                            ?.color
-                        )}
-                      >
-                        <span>
-                          {
-                            getDifficultyBadge(
-                              getPlayerAtPosition(1)?.difficulty
-                            )?.icon
-                          }
-                        </span>
-                        <span>
-                          {
-                            getDifficultyBadge(
-                              getPlayerAtPosition(1)?.difficulty
-                            )?.label
-                          }
-                        </span>
-                      </div>
-                    )}
-                </div>
-                {gameState && (
-                  <div className="text-white/70 text-xs mt-0.5">
-                    Score: {gameState.scores[1]} | Round:{" "}
-                    {gameState.roundScores[1]}
-                  </div>
-                )}
-                <div className="flex flex-col -space-y-10 md:-space-y-14">
-                  {getPlayerAtPosition(1)?.hand.map((card, idx) => (
-                    <motion.div
-                      key={`left-${idx}`}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: idx * 0.03 }}
-                      style={{ zIndex: idx }}
-                    >
-                      <Card
-                        suit={card.suit}
-                        rank={card.rank}
-                        isFlipped={true}
-                        className="w-12 h-16 md:w-14 md:h-20"
-                      />
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          {getPlayerAtPosition(1) && (
+            <OpponentHand
+              player={getPlayerAtPosition(1)!}
+              playerIndex={1}
+              gameState={gameState}
+              position="left"
+            />
+          )}
 
           {/* Right Player (Player 3 - clockwise continues) - Vertical stacked cards */}
-          <div className="absolute right-2 md:right-4 top-1/2 transform -translate-y-1/2">
-            {getPlayerAtPosition(3) && (
-              <div className="flex flex-col items-center gap-1 md:gap-2">
-                <div className="flex flex-col items-center gap-1">
-                  <div
-                    className={cn(
-                      "text-white font-semibold text-xs md:text-sm px-2 md:px-3 py-0.5 md:py-1 rounded-full whitespace-nowrap transition-all",
-                      gameState?.currentPlayerIndex === 3
-                        ? "bg-yellow-500/80 shadow-[0_0_12px_rgba(234,179,8,0.6)]"
-                        : gameState?.trickLeaderIndex === 3
-                        ? "bg-emerald-500/80 shadow-[0_0_12px_rgba(16,185,129,0.6)]"
-                        : "bg-black/30"
-                    )}
-                  >
-                    {getPlayerAtPosition(3)?.name}
-                    {getPlayerAtPosition(3)?.isAI && " 🤖"}
-                    {gameState?.trickLeaderIndex === 3 &&
-                      gameState?.currentPlayerIndex !== 3 &&
-                      " 👑"}
-                  </div>
-                  {getPlayerAtPosition(3)?.isAI &&
-                    getDifficultyBadge(getPlayerAtPosition(3)?.difficulty) && (
-                      <div
-                        className={cn(
-                          "flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium backdrop-blur-sm border shadow-lg",
-                          getDifficultyBadge(getPlayerAtPosition(3)?.difficulty)
-                            ?.color
-                        )}
-                      >
-                        <span>
-                          {
-                            getDifficultyBadge(
-                              getPlayerAtPosition(3)?.difficulty
-                            )?.icon
-                          }
-                        </span>
-                        <span>
-                          {
-                            getDifficultyBadge(
-                              getPlayerAtPosition(3)?.difficulty
-                            )?.label
-                          }
-                        </span>
-                      </div>
-                    )}
-                </div>
-                {gameState && (
-                  <div className="text-white/70 text-xs mt-0.5">
-                    Score: {gameState.scores[3]} | Round:{" "}
-                    {gameState.roundScores[3]}
-                  </div>
-                )}
-                <div className="flex flex-col -space-y-10 md:-space-y-14">
-                  {getPlayerAtPosition(3)?.hand.map((card, idx) => (
-                    <motion.div
-                      key={`right-${idx}`}
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: idx * 0.03 }}
-                      style={{ zIndex: idx }}
-                    >
-                      <Card
-                        suit={card.suit}
-                        rank={card.rank}
-                        isFlipped={true}
-                        className="w-12 h-16 md:w-14 md:h-20"
-                      />
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          {getPlayerAtPosition(3) && (
+            <OpponentHand
+              player={getPlayerAtPosition(3)!}
+              playerIndex={3}
+              gameState={gameState}
+              position="right"
+            />
+          )}
         </motion.div>
       </div>
     </div>
