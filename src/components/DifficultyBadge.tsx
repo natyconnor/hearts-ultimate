@@ -25,6 +25,7 @@ const DIFFICULTY_BADGES = {
   },
 } as const;
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function getDifficultyBadgeInfo(difficulty: AIDifficulty | undefined) {
   if (!difficulty) return null;
   return DIFFICULTY_BADGES[difficulty];

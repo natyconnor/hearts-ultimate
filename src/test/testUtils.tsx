@@ -1,6 +1,13 @@
-import { render, RenderOptions } from "@testing-library/react";
+import { render, type RenderOptions } from "@testing-library/react";
 import type { ReactElement } from "react";
-import type { Card, CardSuit, CardRank, Player, GameState, AIDifficulty } from "../types/game";
+import type {
+  Card,
+  CardSuit,
+  CardRank,
+  Player,
+  GameState,
+  AIDifficulty,
+} from "../types/game";
 
 // Custom render wrapper (can be extended with providers if needed)
 function customRender(
@@ -11,6 +18,7 @@ function customRender(
 }
 
 // Re-export everything from testing-library
+// eslint-disable-next-line react-refresh/only-export-components
 export * from "@testing-library/react";
 export { customRender as render };
 

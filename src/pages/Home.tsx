@@ -96,7 +96,7 @@ export function Home() {
   const navigate = useNavigate();
   const { clearCurrentRoom, setCurrentRoom, setLoading, setError } =
     useGameStore();
-  const [testDifficulty, setTestDifficulty] =
+  const [_testDifficulty, setTestDifficulty] =
     useState<TestDifficulty>("medium");
 
   useEffect(() => {

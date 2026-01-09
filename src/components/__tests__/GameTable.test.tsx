@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "../../test/testUtils";
 import { GameTable } from "../GameTable";
 import {
@@ -7,11 +7,11 @@ import {
   createCard,
   createMixedHand,
 } from "../../test/testUtils";
-import type { Card, GameState, Player } from "../../types/game";
+import type { Card } from "../../types/game";
 
 describe("GameTable Component", () => {
   const defaultProps = {
-    players: createTestPlayers().map((p, i) => ({
+    players: createTestPlayers().map((p) => ({
       ...p,
       hand: createMixedHand(),
     })),
@@ -87,12 +87,7 @@ describe("GameTable Component", () => {
         currentPlayerIndex: 0,
       });
 
-      render(
-        <GameTable
-          {...defaultProps}
-          gameState={gameState}
-        />
-      );
+      render(<GameTable {...defaultProps} gameState={gameState} />);
 
       // Should show "Your Turn" text
       expect(screen.getByText(/Your Turn/)).toBeInTheDocument();
@@ -104,15 +99,9 @@ describe("GameTable Component", () => {
         currentPlayerIndex: 1,
       });
 
-      render(
-        <GameTable
-          {...defaultProps}
-          gameState={gameState}
-        />
-      );
+      render(<GameTable {...defaultProps} gameState={gameState} />);
 
       // Look for crown emoji for trick leader (may be combined with other text)
-      const crown = screen.queryByText(/👑/);
       // Crown may not appear if leader is also current player, so just check rendering works
       expect(screen.getByText(/Bot Bob/)).toBeInTheDocument();
     });
@@ -125,12 +114,7 @@ describe("GameTable Component", () => {
         { playerId: "player-2", card: createCard("clubs", 10) },
       ];
 
-      render(
-        <GameTable
-          {...defaultProps}
-          currentTrick={trick}
-        />
-      );
+      render(<GameTable {...defaultProps} currentTrick={trick} />);
 
       // Cards should be visible
       expect(screen.getAllByText("5").length).toBeGreaterThan(0);
@@ -138,16 +122,9 @@ describe("GameTable Component", () => {
     });
 
     it("positions trick cards based on player position", () => {
-      const trick = [
-        { playerId: "player-0", card: createCard("hearts", 7) },
-      ];
+      const trick = [{ playerId: "player-0", card: createCard("hearts", 7) }];
 
-      const { container } = render(
-        <GameTable
-          {...defaultProps}
-          currentTrick={trick}
-        />
-      );
+      render(<GameTable {...defaultProps} currentTrick={trick} />);
 
       // Card should be rendered
       expect(screen.getAllByText("7").length).toBeGreaterThan(0);
@@ -160,12 +137,7 @@ describe("GameTable Component", () => {
         heartsBroken: true,
       });
 
-      render(
-        <GameTable
-          {...defaultProps}
-          gameState={gameState}
-        />
-      );
+      render(<GameTable {...defaultProps} gameState={gameState} />);
 
       expect(screen.getByText("Hearts Broken")).toBeInTheDocument();
     });
@@ -175,12 +147,7 @@ describe("GameTable Component", () => {
         heartsBroken: false,
       });
 
-      render(
-        <GameTable
-          {...defaultProps}
-          gameState={gameState}
-        />
-      );
+      render(<GameTable {...defaultProps} gameState={gameState} />);
 
       expect(screen.queryByText("Hearts Broken")).not.toBeInTheDocument();
     });
@@ -196,12 +163,7 @@ describe("GameTable Component", () => {
       // Ensure it's the first trick
       gameState.currentTrick = [];
 
-      render(
-        <GameTable
-          {...defaultProps}
-          gameState={gameState}
-        />
-      );
+      render(<GameTable {...defaultProps} gameState={gameState} />);
 
       expect(screen.getByText(/No Pass Round/)).toBeInTheDocument();
     });
@@ -237,12 +199,7 @@ describe("GameTable Component", () => {
         roundScores: [5, 10, 15, 0],
       });
 
-      render(
-        <GameTable
-          {...defaultProps}
-          gameState={gameState}
-        />
-      );
+      render(<GameTable {...defaultProps} gameState={gameState} />);
 
       // Score labels should be visible
       expect(screen.getAllByText(/Score:/)[0]).toBeInTheDocument();
@@ -322,11 +279,7 @@ describe("GameTable Component", () => {
   describe("Edge Cases", () => {
     it("handles empty players array gracefully", () => {
       const { container } = render(
-        <GameTable
-          {...defaultProps}
-          players={[]}
-          gameState={null}
-        />
+        <GameTable {...defaultProps} players={[]} gameState={null} />
       );
 
       // Should still render the table structure
@@ -334,12 +287,7 @@ describe("GameTable Component", () => {
     });
 
     it("handles null gameState", () => {
-      render(
-        <GameTable
-          {...defaultProps}
-          gameState={null}
-        />
-      );
+      render(<GameTable {...defaultProps} gameState={null} />);
 
       // Should render without crashing
       expect(screen.getByText(/You/)).toBeInTheDocument();

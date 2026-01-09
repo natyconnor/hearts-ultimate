@@ -11,7 +11,8 @@ vi.mock("../../store/aiDebugStore", () => ({
 
 // Mock card display
 vi.mock("../../game/cardDisplay", () => ({
-  formatCard: (card: { suit: string; rank: number }) => `${card.rank}${card.suit[0].toUpperCase()}`,
+  formatCard: (card: { suit: string; rank: number }) =>
+    `${card.rank}${card.suit[0].toUpperCase()}`,
 }));
 
 describe("AIDebugOverlay Component", () => {
@@ -21,6 +22,7 @@ describe("AIDebugOverlay Component", () => {
   const createMockLog = (overrides: Partial<AIDebugLog> = {}): AIDebugLog => ({
     id: "log-1",
     timestamp: Date.now(),
+    playerId: "player-1",
     playerName: "Bot Alice",
     difficulty: "hard",
     actionType: "play",
@@ -38,7 +40,7 @@ describe("AIDebugOverlay Component", () => {
       },
     ],
     roundNumber: 3,
-    aiVersion: "1.0.0",
+    aiVersion: 8,
     ...overrides,
   });
 
@@ -61,7 +63,7 @@ describe("AIDebugOverlay Component", () => {
     });
 
     it("shows brain icon in toggle button", () => {
-      const { container } = render(<AIDebugOverlay />);
+      render(<AIDebugOverlay />);
 
       const button = screen.getByTitle("AI Debugger");
       const svg = button.querySelector("svg");
@@ -122,8 +124,8 @@ describe("AIDebugOverlay Component", () => {
       render(<AIDebugOverlay />);
 
       const closeButtons = screen.getAllByRole("button");
-      const xButton = closeButtons.find(btn =>
-        btn.querySelector('svg.w-4.h-4')
+      const xButton = closeButtons.find((btn) =>
+        btn.querySelector("svg.w-4.h-4")
       );
 
       if (xButton) {
@@ -135,9 +137,22 @@ describe("AIDebugOverlay Component", () => {
 
   describe("Open State - With Logs", () => {
     const mockLogs = [
-      createMockLog({ id: "log-1", playerName: "Bot Alice", difficulty: "hard" }),
-      createMockLog({ id: "log-2", playerName: "Bot Bob", difficulty: "medium" }),
-      createMockLog({ id: "log-3", playerName: "Bot Carol", difficulty: "easy", actionType: "pass" }),
+      createMockLog({
+        id: "log-1",
+        playerName: "Bot Alice",
+        difficulty: "hard",
+      }),
+      createMockLog({
+        id: "log-2",
+        playerName: "Bot Bob",
+        difficulty: "medium",
+      }),
+      createMockLog({
+        id: "log-3",
+        playerName: "Bot Carol",
+        difficulty: "easy",
+        actionType: "pass",
+      }),
     ];
 
     beforeEach(() => {
@@ -184,7 +199,9 @@ describe("AIDebugOverlay Component", () => {
 
     it("does not show waiting message with logs", () => {
       render(<AIDebugOverlay />);
-      expect(screen.queryByText("Waiting for AI actions...")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Waiting for AI actions...")
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -209,14 +226,18 @@ describe("AIDebugOverlay Component", () => {
 
     it("shows context info in collapsed view", () => {
       render(<AIDebugOverlay />);
-      expect(screen.getByText("Leading trick, hearts not broken")).toBeInTheDocument();
+      expect(
+        screen.getByText("Leading trick, hearts not broken")
+      ).toBeInTheDocument();
     });
 
     it("expands log when clicked", () => {
       render(<AIDebugOverlay />);
 
       // Click on the log entry
-      const logEntry = screen.getByText("Bot Alice").closest('[class*="cursor-pointer"]');
+      const logEntry = screen
+        .getByText("Bot Alice")
+        .closest('[class*="cursor-pointer"]');
       if (logEntry) {
         fireEvent.click(logEntry);
       }
@@ -228,7 +249,9 @@ describe("AIDebugOverlay Component", () => {
     it("shows considered cards in expanded view", () => {
       render(<AIDebugOverlay />);
 
-      const logEntry = screen.getByText("Bot Alice").closest('[class*="cursor-pointer"]');
+      const logEntry = screen
+        .getByText("Bot Alice")
+        .closest('[class*="cursor-pointer"]');
       if (logEntry) {
         fireEvent.click(logEntry);
       }
@@ -240,7 +263,9 @@ describe("AIDebugOverlay Component", () => {
     it("shows memory snapshot for hard AI", () => {
       render(<AIDebugOverlay />);
 
-      const logEntry = screen.getByText("Bot Alice").closest('[class*="cursor-pointer"]');
+      const logEntry = screen
+        .getByText("Bot Alice")
+        .closest('[class*="cursor-pointer"]');
       if (logEntry) {
         fireEvent.click(logEntry);
       }
@@ -252,7 +277,9 @@ describe("AIDebugOverlay Component", () => {
     it("shows moon shooter candidate in memory", () => {
       render(<AIDebugOverlay />);
 
-      const logEntry = screen.getByText("Bot Alice").closest('[class*="cursor-pointer"]');
+      const logEntry = screen
+        .getByText("Bot Alice")
+        .closest('[class*="cursor-pointer"]');
       if (logEntry) {
         fireEvent.click(logEntry);
       }
@@ -263,7 +290,9 @@ describe("AIDebugOverlay Component", () => {
     it("shows void suits in memory", () => {
       render(<AIDebugOverlay />);
 
-      const logEntry = screen.getByText("Bot Alice").closest('[class*="cursor-pointer"]');
+      const logEntry = screen
+        .getByText("Bot Alice")
+        .closest('[class*="cursor-pointer"]');
       if (logEntry) {
         fireEvent.click(logEntry);
       }

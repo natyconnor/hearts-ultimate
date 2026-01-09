@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "../../test/testUtils";
 import { CardHand } from "../CardHand";
 import { createCard, createMixedHand } from "../../test/testUtils";
-import type { Card } from "../../types/game";
+import type { Card, CardRank } from "../../types/game";
 
 describe("CardHand Component", () => {
   describe("Rendering", () => {
@@ -206,7 +206,7 @@ describe("CardHand Component", () => {
     it("handles large hand (more than 13 cards)", () => {
       const cards: Card[] = [];
       for (let i = 2; i <= 14; i++) {
-        cards.push(createCard("hearts", i as any));
+        cards.push(createCard("hearts", i as CardRank));
       }
       cards.push(createCard("diamonds", 2));
       cards.push(createCard("diamonds", 3));

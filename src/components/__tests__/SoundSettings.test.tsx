@@ -50,7 +50,7 @@ describe("SoundSettings Component", () => {
     });
 
     it("contains settings icon (gear)", () => {
-      const { container } = render(<SoundSettings />);
+      render(<SoundSettings />);
 
       // Should have an SVG icon
       const button = screen.getByLabelText("Sound settings");
