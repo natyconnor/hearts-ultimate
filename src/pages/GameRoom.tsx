@@ -8,11 +8,13 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import { Home, ChevronDown } from "lucide-react";
+import { SoundSettings } from "../components/SoundSettings";
 import { cn } from "../lib/utils";
 import {
   getRoomBySlug,
   updateRoomGameState,
   updateRoomStatus,
+  deleteRoom,
 } from "../lib/roomApi";
 import { useGameRealtime } from "../hooks/useGameRealtime";
 import { useRoomSync } from "../hooks/useRoomSync";
@@ -389,20 +391,32 @@ export function GameRoom() {
         players: updatedPlayers,
       };
 
-      if (roomStatus === "playing") {
-        await updateRoomStatus(slug, "finished");
-      }
+      // If this was the last player, delete the room
+      const isRoomEmpty = updatedPlayers.length === 0;
 
-      await updateRoomGameState(slug, updatedGameState);
+      if (isRoomEmpty) {
+        await deleteRoom(slug);
+      } else {
+        if (roomStatus === "playing") {
+          await updateRoomStatus(slug, "finished");
+        }
+        await updateRoomGameState(slug, updatedGameState);
+      }
 
       localStorage.removeItem(STORAGE_KEYS.PLAYER_ID);
       localStorage.removeItem(STORAGE_KEYS.PLAYER_NAME);
       setCurrentPlayerId(null);
 
-      return { updatedGameState, endedGame: roomStatus === "playing" };
+      return {
+        updatedGameState,
+        endedGame: roomStatus === "playing",
+        roomDeleted: isRoomEmpty,
+      };
     },
     onSuccess: (result) => {
-      updateGameState(result.updatedGameState);
+      if (!result.roomDeleted) {
+        updateGameState(result.updatedGameState);
+      }
       queryClient.invalidateQueries({ queryKey: ["room", slug] });
       if (result.endedGame) {
         alert("A player left the game. The game has ended.");
@@ -537,15 +551,8 @@ export function GameRoom() {
       setShowGameEnd(false);
       showGameEndRef.current = false;
       setSelectedCardsToPass([]); // Reset pass selection for new game
-      // Clear logs when starting new game in test mode
-      // Check test mode via search params or if all players are AI
-      const currentPlayers = updatedGameState.players;
-      const isInTestMode =
-        searchParams.get("test") === "true" ||
-        (currentPlayers.length === 4 && currentPlayers.every((p) => p.isAI));
-      if (isInTestMode) {
-        useAIDebugStore.getState().clearLogs();
-      }
+      // Clear logs when starting a new game
+      useAIDebugStore.getState().clearLogs();
       updateGameState(updatedGameState);
       queryClient.invalidateQueries({ queryKey: ["room", slug] });
     },
@@ -902,6 +909,7 @@ export function GameRoom() {
           <div className="w-full px-4 md:px-6 lg:px-8 py-3 md:py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-6">
+                <SoundSettings />
                 <Link
                   to="/"
                   className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium text-sm transition-all border border-white/20 hover:border-white/30 cursor-pointer"
@@ -1076,7 +1084,11 @@ export function GameRoom() {
 
   // Lobby view when waiting
   return (
-    <div className="min-h-screen bg-gradient-to-br from-poker-green via-green-800 to-poker-green flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-poker-green via-green-800 to-poker-green flex items-center justify-center p-4 relative">
+      {/* Sound Settings - Top Left */}
+      <div className="absolute top-4 left-4 z-10">
+        <SoundSettings />
+      </div>
       <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-2xl w-full">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold text-poker-green">Game Room</h1>

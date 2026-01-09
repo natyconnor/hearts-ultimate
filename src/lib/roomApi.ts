@@ -104,3 +104,17 @@ export async function updateRoomStatus(
     throw new Error(`Failed to update room status: ${error.message}`);
   }
 }
+
+/**
+ * Deletes a room by its slug
+ */
+export async function deleteRoom(slug: string): Promise<void> {
+  const { error } = await supabase
+    .from("game_rooms")
+    .delete()
+    .eq("slug", slug);
+
+  if (error) {
+    throw new Error(`Failed to delete room: ${error.message}`);
+  }
+}

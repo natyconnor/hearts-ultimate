@@ -40,8 +40,16 @@ class SoundManager {
     this.enabled = enabled;
   }
 
+  getEnabled(): boolean {
+    return this.enabled;
+  }
+
   setVolume(volume: number): void {
     this.volume = Math.max(0, Math.min(1, volume));
+  }
+
+  getVolume(): number {
+    return this.volume;
   }
 
   play(type: SoundType): void {
@@ -282,6 +290,23 @@ class SoundManager {
 
 // Singleton instance
 export const soundManager = new SoundManager();
+
+// Initialize from localStorage if available
+if (typeof window !== 'undefined') {
+  const storedEnabled = localStorage.getItem('hearts-sound-enabled');
+  const storedVolume = localStorage.getItem('hearts-sound-volume');
+
+  if (storedEnabled !== null) {
+    soundManager.setEnabled(storedEnabled === 'true');
+  }
+
+  if (storedVolume !== null) {
+    const volume = parseFloat(storedVolume);
+    if (!isNaN(volume) && volume >= 0 && volume <= 1) {
+      soundManager.setVolume(volume);
+    }
+  }
+}
 
 // Convenience function
 export function playSound(type: SoundType): void {

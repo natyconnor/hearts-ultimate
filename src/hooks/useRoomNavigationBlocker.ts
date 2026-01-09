@@ -1,6 +1,10 @@
 import { useEffect, useRef } from "react";
 import { useBlocker } from "react-router-dom";
-import { updateRoomGameState, updateRoomStatus } from "../lib/roomApi";
+import {
+  updateRoomGameState,
+  updateRoomStatus,
+  deleteRoom,
+} from "../lib/roomApi";
 import { useGameStore } from "../store/gameStore";
 import { STORAGE_KEYS } from "../lib/constants";
 import type { GameState } from "../types/game";
@@ -64,9 +68,17 @@ export function useRoomNavigationBlocker({
       players: updatedPlayers,
     };
 
-    const promises = [updateRoomGameState(slug, updatedGameState)];
-    if (currentRoomStatus === "playing") {
-      promises.push(updateRoomStatus(slug, "finished"));
+    // If this was the last player, delete the room
+    const isRoomEmpty = updatedPlayers.length === 0;
+
+    const promises: Promise<void>[] = [];
+    if (isRoomEmpty) {
+      promises.push(deleteRoom(slug));
+    } else {
+      promises.push(updateRoomGameState(slug, updatedGameState));
+      if (currentRoomStatus === "playing") {
+        promises.push(updateRoomStatus(slug, "finished"));
+      }
     }
 
     Promise.all(promises)
