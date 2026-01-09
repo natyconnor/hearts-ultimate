@@ -16,8 +16,10 @@ export type { AIDifficulty } from "../../types/game";
  * v4: Explicit currentTrickNumber, Q♠ current trick detection, proportional penalties
  * v5: Low card protection during passing
  * v6: Proactive moon shooting, detection, and prevention
+ * v7: Fixed players after us bug and ducking evaluation
+ * v8: Fixed mid-range cards scoring 0 during passing
  */
-export const AI_VERSION = 6;
+export const AI_VERSION = 8;
 
 /** Context for play decisions */
 export interface PlayContext {

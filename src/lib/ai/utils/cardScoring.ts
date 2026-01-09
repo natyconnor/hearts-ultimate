@@ -46,6 +46,11 @@ export function scoreCardsForPassing(
     if (card.rank < PASS_SCORES.LOW_CARD_THRESHOLD) {
       score += PASS_SCORES.LOW_CARD_PROTECTION;
       reasons.push("Valuable low card for ducking");
+    } else if (card.rank <= RANK.MID_RANGE_MAX) {
+      // Mid-range cards (6-10) are still useful for ducking, just less so
+      // Give them partial protection to prevent passing with score=0
+      score += PASS_SCORES.LOW_CARD_PROTECTION * 0.3; // -10.5
+      reasons.push("Mid card (useful for ducking)");
     }
 
     // PRIMARY FACTOR: High cards are risky because they win tricks

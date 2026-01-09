@@ -92,7 +92,7 @@ export const FOLLOW_SCORES = {
   PENALTY_POINTS_MULTIPLIER: -5,
   SAFE_WIN_LAST_PLAYER: 10,
   RISK_OF_DUMP: -15,
-  DUCK: 25,
+  DUCK: 30, // Boosted from 25 to slightly prefer ducking over risky wins
   MOON_SHOT_TAKE: 50,
   STOP_MOON: 150,
   SAFE_WIN: 20,

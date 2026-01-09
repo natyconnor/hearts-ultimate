@@ -47,30 +47,53 @@ export function scoreFollowCards(
 
     // Critical: playing Q♠ and winning
     if (wouldWin && isQueenOfSpades(card) && !context.isFirstTrick) {
-      score += FOLLOW_SCORES.WIN_WITH_POINTS_BASE + 13 * FOLLOW_SCORES.PENALTY_POINTS_MULTIPLIER;
+      score +=
+        FOLLOW_SCORES.WIN_WITH_POINTS_BASE +
+        13 * FOLLOW_SCORES.PENALTY_POINTS_MULTIPLIER;
       reasons.push("Would win with Q♠ (13 pts!)");
       return { card, score, reasons };
     }
 
     // High spades risky when Q♠ still out
-    const queenAccountedFor = isQueenOfSpadesInTrick(currentTrickCards) || memory.isQueenOfSpadesPlayed();
+    const queenAccountedFor =
+      isQueenOfSpadesInTrick(currentTrickCards) ||
+      memory.isQueenOfSpadesPlayed();
 
-    if (wouldWin && card.suit === "spades" && card.rank > RANK.QUEEN && !queenAccountedFor && !context.isFirstTrick) {
+    if (
+      wouldWin &&
+      card.suit === "spades" &&
+      card.rank > RANK.QUEEN &&
+      !queenAccountedFor &&
+      !context.isFirstTrick
+    ) {
       score += FOLLOW_SCORES.RISK_OF_DUMP * 2;
       reasons.push("High spade risk - Q♠ still out");
     }
 
     if (wouldWin) {
       scoreWinningPlay(
-        card, context, memory, config, penaltyPoints, lastToPlay,
-        forcedToWin, moonShooterIndex, reasons, (adj) => { score += adj; }
+        card,
+        context,
+        memory,
+        config,
+        penaltyPoints,
+        lastToPlay,
+        forcedToWin,
+        moonShooterIndex,
+        reasons,
+        (adj) => {
+          score += adj;
+        }
       );
     } else {
       score += FOLLOW_SCORES.DUCK;
       reasons.push("Ducking");
 
       // When stopping moon: save high cards. Otherwise: play highest that still ducks.
-      if (moonShooterIndex !== null && moonShooterIndex !== context.playerIndex) {
+      if (
+        moonShooterIndex !== null &&
+        moonShooterIndex !== context.playerIndex
+      ) {
         score -= card.rank;
         reasons.push("Save high for moon defense");
       } else {
@@ -82,7 +105,11 @@ export function scoreFollowCards(
   });
 }
 
-function scoreMoonFollow(card: Card, wouldWin: boolean, penaltyPoints: number): ScoredCard {
+function scoreMoonFollow(
+  card: Card,
+  wouldWin: boolean,
+  penaltyPoints: number
+): ScoredCard {
   let score = FOLLOW_SCORES.BASE;
   const reasons: string[] = [];
 
@@ -133,10 +160,19 @@ function scoreWinningPlay(
   }
 
   if (penaltyPoints > 0) {
-    const currentWinnerIndex = getCurrentTrickWinner(context.currentTrickCards, context.gameState);
+    const currentWinnerIndex = getCurrentTrickWinner(
+      context.currentTrickCards,
+      context.gameState
+    );
     scoreWinWithPenalties(
-      card, penaltyPoints, forcedToWin, moonShooterIndex,
-      context.playerIndex, currentWinnerIndex, reasons, addScore
+      card,
+      penaltyPoints,
+      forcedToWin,
+      moonShooterIndex,
+      context.playerIndex,
+      currentWinnerIndex,
+      reasons,
+      addScore
     );
   } else if (lastToPlay) {
     addScore(FOLLOW_SCORES.SAFE_WIN);
@@ -169,7 +205,8 @@ function scoreWinWithPenalties(
     reasons.push("Moon shot - take penalties");
   } else if (moonShooterIndex !== null) {
     // Someone else shooting - check if we need to stop them
-    const nonShooterWinning = currentWinnerIndex !== null && currentWinnerIndex !== moonShooterIndex;
+    const nonShooterWinning =
+      currentWinnerIndex !== null && currentWinnerIndex !== moonShooterIndex;
 
     if (nonShooterWinning) {
       addScore(FOLLOW_SCORES.WIN_WITH_POINTS_BASE);
@@ -179,7 +216,10 @@ function scoreWinWithPenalties(
       reasons.push("Stop moon - take points");
     }
   } else {
-    addScore(FOLLOW_SCORES.WIN_WITH_POINTS_BASE + penaltyPoints * FOLLOW_SCORES.PENALTY_POINTS_MULTIPLIER);
+    addScore(
+      FOLLOW_SCORES.WIN_WITH_POINTS_BASE +
+        penaltyPoints * FOLLOW_SCORES.PENALTY_POINTS_MULTIPLIER
+    );
     if (forcedToWin) {
       addScore(card.rank);
       reasons.push("Forced win - dump highest");
@@ -196,33 +236,45 @@ function scoreRiskyWin(
   reasons: string[],
   addScore: (adj: number) => void
 ): void {
-  const { playerIndex, gameState, leadSuit, currentTrickCards } = context;
+  const { gameState, leadSuit, currentTrickCards } = context;
 
+  // Check which players haven't played yet by looking at who's in the trick
+  const playersWhoPlayed = new Set(currentTrickCards.map((c) => c.playerId));
+  const ourPlayerId = gameState.players[context.playerIndex].id;
+
+  // Find players who haven't played yet (excluding us)
+  const playersAfterUs = gameState.players.filter(
+    (p) => p.id !== ourPlayerId && !playersWhoPlayed.has(p.id)
+  );
+
+  // Check how many of them are known void in the lead suit
   let voidPlayersAhead = 0;
-  const playersAfterUs = 3 - currentTrickCards.length;
-
-  for (let i = 1; i <= playersAfterUs; i++) {
-    const nextPlayerIdx = (playerIndex + i) % 4;
-    const nextPlayerId = gameState.players[nextPlayerIdx].id;
-    if (memory.isPlayerVoid(nextPlayerId, leadSuit!)) {
+  for (const player of playersAfterUs) {
+    if (memory.isPlayerVoid(player.id, leadSuit!)) {
       voidPlayersAhead++;
     }
+  }
+
+  // Known void = NEVER safe. Don't even consider "likely safe".
+  if (voidPlayersAhead > 0) {
+    addScore(FOLLOW_SCORES.RISK_OF_DUMP * 3);
+    reasons.push("Known void player(s) ahead - DUCK!");
+    return;
   }
 
   const memoryStats = memory.getStats();
   const memoryReliable = memoryStats.tricksCounted >= 2;
 
-  if (memoryReliable && voidPlayersAhead === 0) {
+  if (memoryReliable) {
+    // No known voids and memory is reliable - probably safe
     addScore(FOLLOW_SCORES.SAFE_WIN * 0.5);
     reasons.push("Likely safe (memory)");
     if (forcedToWin || card.rank > RANK.MID_RANGE_MAX) {
       addScore(card.rank);
       reasons.push("Dump high card");
     }
-  } else if (voidPlayersAhead > 0) {
-    addScore(FOLLOW_SCORES.RISK_OF_DUMP * 2);
-    reasons.push("Known void player(s) ahead");
   } else {
+    // Early game, no info yet - slight risk
     addScore(FOLLOW_SCORES.RISK_OF_DUMP);
     reasons.push("Risk of penalty dump");
   }

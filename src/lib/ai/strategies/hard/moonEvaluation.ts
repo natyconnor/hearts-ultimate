@@ -18,7 +18,7 @@ export interface MoonEvaluation {
 }
 
 const MOON_EVAL = {
-  ATTEMPT_THRESHOLD: 65,
+  ATTEMPT_THRESHOLD: 75,
   HIGH_CONFIDENCE_THRESHOLD: 80,
 
   // Critical cards
@@ -50,10 +50,16 @@ export function evaluateMoonPotential(hand: Card[]): MoonEvaluation {
   const distribution = getSuitDistribution(hand);
 
   // Critical cards
-  const hasAceOfHearts = hand.some((c) => c.suit === "hearts" && c.rank === RANK.ACE);
+  const hasAceOfHearts = hand.some(
+    (c) => c.suit === "hearts" && c.rank === RANK.ACE
+  );
   const hasQueenOfSpades = hand.some(isQueenOfSpades);
-  const hasKingOfSpades = hand.some((c) => c.suit === "spades" && c.rank === RANK.KING);
-  const hasAceOfSpades = hand.some((c) => c.suit === "spades" && c.rank === RANK.ACE);
+  const hasKingOfSpades = hand.some(
+    (c) => c.suit === "spades" && c.rank === RANK.KING
+  );
+  const hasAceOfSpades = hand.some(
+    (c) => c.suit === "spades" && c.rank === RANK.ACE
+  );
 
   if (hasAceOfHearts) {
     score += MOON_EVAL.ACE_OF_HEARTS;
@@ -100,7 +106,8 @@ export function evaluateMoonPotential(hand: Card[]): MoonEvaluation {
   }
 
   if (totalHighCards >= 6) reasons.push(`Strong: ${totalHighCards} high cards`);
-  else if (totalHighCards >= 4) reasons.push(`Decent: ${totalHighCards} high cards`);
+  else if (totalHighCards >= 4)
+    reasons.push(`Decent: ${totalHighCards} high cards`);
   else reasons.push(`Weak: only ${totalHighCards} high cards`);
 
   if (suitsWithHighCards >= 3) {
@@ -153,7 +160,10 @@ export function evaluateMoonPotential(hand: Card[]): MoonEvaluation {
 function countHighCardsBySuit(
   hand: Card[]
 ): Record<CardSuit, { queens: number; kings: number; aces: number }> {
-  const result: Record<CardSuit, { queens: number; kings: number; aces: number }> = {
+  const result: Record<
+    CardSuit,
+    { queens: number; kings: number; aces: number }
+  > = {
     clubs: { queens: 0, kings: 0, aces: 0 },
     diamonds: { queens: 0, kings: 0, aces: 0 },
     spades: { queens: 0, kings: 0, aces: 0 },
@@ -198,7 +208,9 @@ export function scoreMoonPassCards(
     let score = 0;
     const reasons: string[] = [];
 
-    const isKeepCard = keepCards.some((k) => k.suit === card.suit && k.rank === card.rank);
+    const isKeepCard = keepCards.some(
+      (k) => k.suit === card.suit && k.rank === card.rank
+    );
 
     if (isKeepCard) {
       score -= 150;

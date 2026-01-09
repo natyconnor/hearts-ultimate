@@ -78,8 +78,9 @@ export function scoreDumpCards(
     // High non-penalty cards
     if (card.rank >= RANK.HIGH_THRESHOLD && !isPenaltyCard(card)) {
       if (moonShooterIndex !== null && moonShooterIndex !== playerIndex) {
-        // Keep high cards for moon defense
-        score -= 40;
+        // Keep high cards for moon defense - prefer keeping HIGHER cards (A > K > Q)
+        // Add small rank bonus so we dump J before Q before K before A
+        score -= 40 - card.rank * 0.5;
         reasons.push("Keep high card (moon defense)");
       } else {
         score += card.rank * DUMP_SCORES.HIGH_CARD_RANK_MULTIPLIER;
@@ -94,10 +95,13 @@ export function scoreDumpCards(
         memory.isQueenOfSpadesPlayed();
 
       if (!queenAccountedFor) {
-        score += DUMP_SCORES.HARD_KEEP_SPADE_QUEEN_OUT;
+        // When Q♠ still out, prefer dumping HIGHER spades (keep lower ones for protection)
+        // Add small rank bonus so 10♠ > 7♠ > 3♠ for dumping priority
+        score += DUMP_SCORES.HARD_KEEP_SPADE_QUEEN_OUT + card.rank * 0.5;
         reasons.push("Keep spade - Q♠ still out");
       } else {
-        score += DUMP_SCORES.HARD_KEEP_LOW_SPADE;
+        // Q♠ is gone, still prefer keeping lower spades but less critical
+        score += DUMP_SCORES.HARD_KEEP_LOW_SPADE + card.rank * 0.3;
         reasons.push("Keep low spade");
       }
     }
