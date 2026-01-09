@@ -1,10 +1,14 @@
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { ChevronRight, Moon, Heart, Sparkles, Star } from "lucide-react";
 import type { Player, Card, AIDifficulty } from "../types/game";
 import { Card as CardComponent } from "./Card";
 import { cn } from "../lib/utils";
-import { getScoreColor, getProgressBarColor, buttonClasses } from "../lib/styles";
-import { useEffect } from "react";
+import {
+  getScoreColor,
+  getProgressBarColor,
+  buttonClasses,
+} from "../lib/styles";
+import { useEffect, useState } from "react";
 import { playSound } from "../lib/sounds";
 
 interface RoundSummaryOverlayProps {
@@ -100,7 +104,9 @@ export function RoundSummaryOverlay({
             </div>
 
             {shotTheMoon && (
-              <MoonCelebration playerName={players[shotTheMoon.playerIndex].name} />
+              <MoonCelebration
+                playerName={players[shotTheMoon.playerIndex].name}
+              />
             )}
           </motion.div>
 
@@ -169,12 +175,22 @@ export function RoundSummaryOverlay({
                     )}
                   </div>
                   <div className="text-center">
-                    <span className={cn("font-bold", getScoreColor(roundScore, "round"))}>
+                    <span
+                      className={cn(
+                        "font-bold",
+                        getScoreColor(roundScore, "round")
+                      )}
+                    >
                       {roundScore > 0 ? `+${roundScore}` : roundScore}
                     </span>
                   </div>
                   <div className="text-right">
-                    <span className={cn("font-bold", getScoreColor(totalScore, "total"))}>
+                    <span
+                      className={cn(
+                        "font-bold",
+                        getScoreColor(totalScore, "total")
+                      )}
+                    >
                       {totalScore}
                     </span>
                   </div>
@@ -222,7 +238,9 @@ export function RoundSummaryOverlay({
                                   "flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium backdrop-blur-sm border",
                                   getDifficultyBadge(player.difficulty)?.color
                                 )}
-                                title={getDifficultyBadge(player.difficulty)?.label}
+                                title={
+                                  getDifficultyBadge(player.difficulty)?.label
+                                }
                               >
                                 <span>
                                   {getDifficultyBadge(player.difficulty)?.icon}
@@ -324,21 +342,25 @@ export function RoundSummaryOverlay({
  * Spectacular moon shooting celebration animation
  */
 function MoonCelebration({ playerName }: { playerName: string }) {
-  // Generate random particles for the celebration
-  const particles = Array.from({ length: 20 }, (_, i) => ({
-    id: i,
-    angle: (i / 20) * 360,
-    delay: i * 0.05,
-    distance: 80 + Math.random() * 40,
-  }));
+  // Generate random particles for the celebration (using useState lazy initializer to avoid calling Math.random during render)
+  const [particles] = useState(() =>
+    Array.from({ length: 20 }, (_, i) => ({
+      id: i,
+      angle: (i / 20) * 360,
+      delay: i * 0.05,
+      distance: 80 + Math.random() * 40,
+    }))
+  );
 
-  const stars = Array.from({ length: 12 }, (_, i) => ({
-    id: i,
-    x: (Math.random() - 0.5) * 300,
-    y: (Math.random() - 0.5) * 150,
-    delay: 0.5 + Math.random() * 0.5,
-    scale: 0.5 + Math.random() * 0.5,
-  }));
+  const [stars] = useState(() =>
+    Array.from({ length: 12 }, (_, i) => ({
+      id: i,
+      x: (Math.random() - 0.5) * 300,
+      y: (Math.random() - 0.5) * 150,
+      delay: 0.5 + Math.random() * 0.5,
+      scale: 0.5 + Math.random() * 0.5,
+    }))
+  );
 
   return (
     <motion.div

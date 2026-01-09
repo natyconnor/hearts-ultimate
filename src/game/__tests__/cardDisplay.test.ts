@@ -9,7 +9,11 @@ import {
 } from "../cardDisplay";
 import type { Card } from "../../types/game";
 
-const card = (suit: Card["suit"], rank: Card["rank"]): Card => ({ suit, rank });
+const card = (suit: Card["suit"], rank: Card["rank"]): Card => ({
+  suit,
+  rank,
+  points: suit === "hearts" ? 1 : suit === "spades" && rank === 12 ? 13 : 0,
+});
 
 describe("cardDisplay - calculateCardHandLayout", () => {
   it("calculates layout for different card counts", () => {
