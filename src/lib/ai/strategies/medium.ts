@@ -8,7 +8,7 @@
  * - Smarter passing (suit protection, voiding)
  */
 
-import type { Card } from "../../../types/game";
+import type { Card, GameState } from "../../../types/game";
 import type {
   AIStrategy,
   PlayContext,
@@ -20,10 +20,11 @@ import {
   THRESHOLDS,
   PASS_SCORES,
   LEAD_SCORES,
+  AI_VERSION,
   FOLLOW_SCORES,
   DUMP_SCORES,
 } from "../types";
-import { isQueenOfSpades, isHeart, isPenaltyCard } from "../../../game/rules";
+import { isQueenOfSpades, isHeart } from "../../../game/rules";
 import { scoreCardsForPassing } from "../utils/cardScoring";
 import {
   getPenaltyPointsInTrick,
@@ -35,6 +36,28 @@ import { useAIDebugStore } from "../../../store/aiDebugStore";
 
 export class MediumStrategy implements AIStrategy {
   readonly difficulty = "medium" as const;
+  private queenOfSpadesPlayed = false;
+
+  /**
+   * Called when a new round starts - reset Q♠ tracking
+   */
+  onRoundStart(): void {
+    this.queenOfSpadesPlayed = false;
+  }
+
+  /**
+   * Called when a trick completes - check if Q♠ was played
+   */
+  onTrickComplete(
+    trick: Array<{ playerId: string; card: Card }>,
+    _winnerIndex: number,
+    _trickNumber: number,
+    _gameState?: GameState
+  ): void {
+    if (trick.some((play) => isQueenOfSpades(play.card))) {
+      this.queenOfSpadesPlayed = true;
+    }
+  }
 
   /**
    * Choose 3 cards to pass
@@ -64,6 +87,7 @@ export class MediumStrategy implements AIStrategy {
       roundNumber: context.gameState.roundNumber,
       decision: chosenCards,
       consideredCards: scoredCards,
+      aiVersion: AI_VERSION,
       contextInfo: `Passing ${context.gameState.passDirection}`,
     });
 
@@ -129,6 +153,7 @@ export class MediumStrategy implements AIStrategy {
       isFirstTrick,
       gameState,
       playerIndex,
+      tricksPlayedThisRound,
     } = context;
 
     // First trick - must play 2 of clubs if we have it
@@ -143,11 +168,13 @@ export class MediumStrategy implements AIStrategy {
           difficulty: "medium",
           actionType: "play",
           roundNumber: gameState.roundNumber,
+          trickNumber: 1,
           decision: twoOfClubs,
           consideredCards: [
             { card: twoOfClubs, score: 1000, reasons: ["Must play 2♣"] },
           ],
           contextInfo: "First trick mandatory play",
+          aiVersion: AI_VERSION,
         });
         return twoOfClubs;
       }
@@ -184,9 +211,11 @@ export class MediumStrategy implements AIStrategy {
       difficulty: "medium",
       actionType: "play",
       roundNumber: gameState.roundNumber,
+      trickNumber: tricksPlayedThisRound + 1,
       decision: chosenCard,
       consideredCards: scoredCards,
       contextInfo,
+      aiVersion: AI_VERSION,
     });
 
     return chosenCard;
@@ -206,6 +235,14 @@ export class MediumStrategy implements AIStrategy {
       // Prefer leading low cards
       score -= card.rank * LEAD_SCORES.RANK_PENALTY_MULTIPLIER;
 
+      // Penalize leading penalty cards based on their point values
+      if (card.points > 0) {
+        score -= card.points * LEAD_SCORES.RANK_PENALTY_MULTIPLIER * 2;
+        reasons.push(
+          `Leading risks ${card.points} point${card.points > 1 ? "s" : ""}!`
+        );
+      }
+
       // Avoid leading hearts (will get points dumped)
       if (isHeart(card) && !context.gameState.heartsBroken) {
         if (card.rank <= RANK.LOW_THRESHOLD) {
@@ -221,9 +258,22 @@ export class MediumStrategy implements AIStrategy {
       if (card.suit === "spades") {
         const holdsQueen = validCards.some(isQueenOfSpades);
 
-        if (!holdsQueen && card.rank < RANK.QUEEN) {
+        if (
+          !holdsQueen &&
+          card.rank < RANK.QUEEN &&
+          !this.queenOfSpadesPlayed
+        ) {
+          // Q♠ is still out there - fish for it
           score += LEAD_SCORES.FISH_FOR_QUEEN;
           reasons.push("Fishing for Q♠");
+        } else if (
+          !holdsQueen &&
+          card.rank < RANK.QUEEN &&
+          this.queenOfSpadesPlayed
+        ) {
+          // Q♠ already played - safe spade lead
+          score += LEAD_SCORES.EARLY_SAFE_LEAD;
+          reasons.push("Safe spade lead (Q♠ played)");
         } else if (holdsQueen && card.rank < RANK.QUEEN) {
           score += LEAD_SCORES.PRESERVE_QUEEN_PROTECTION;
           reasons.push("Preserve Q♠ protection");
@@ -278,6 +328,32 @@ export class MediumStrategy implements AIStrategy {
 
       const wouldWin = card.rank > currentHighest;
 
+      // CRITICAL: Check if playing this card would give us penalty points
+      // Use the card's built-in point value
+      if (wouldWin && card.points > 0 && !context.isFirstTrick) {
+        // Playing a penalty card and winning = we take those points!
+        score +=
+          FOLLOW_SCORES.WIN_WITH_POINTS_BASE +
+          card.points * FOLLOW_SCORES.PENALTY_POINTS_MULTIPLIER;
+        reasons.push(`Would win with ${card.points} pts!`);
+        if (card.points >= 13) {
+          return { card, score, reasons }; // Q♠ is catastrophic, exit early
+        }
+      }
+
+      // High spades (K♠, A♠) are dangerous when Q♠ is still out
+      if (
+        wouldWin &&
+        card.suit === "spades" &&
+        card.rank > RANK.QUEEN &&
+        !this.queenOfSpadesPlayed &&
+        !context.isFirstTrick
+      ) {
+        // Someone might dump Q♠ on us
+        score += FOLLOW_SCORES.RISK_OF_DUMP * 2;
+        reasons.push("High spade risk - Q♠ still out");
+      }
+
       if (wouldWin) {
         if (context.isFirstTrick) {
           score += FOLLOW_SCORES.TRICK_1_SAFE_WIN;
@@ -296,7 +372,10 @@ export class MediumStrategy implements AIStrategy {
           reasons.push("Safe win as last player");
         } else {
           // Might get penalties dumped on us
-          score += FOLLOW_SCORES.RISK_OF_DUMP;
+          // Higher cards are MORE likely to win, so they're riskier
+          // Scale the penalty based on how high the card is
+          const riskMultiplier = card.rank / RANK.ACE; // 0.14 to 1.0
+          score += FOLLOW_SCORES.RISK_OF_DUMP * (1 + riskMultiplier);
           reasons.push("Risk of penalty dump");
         }
       } else {
@@ -325,22 +404,18 @@ export class MediumStrategy implements AIStrategy {
       let score = DUMP_SCORES.BASE;
       const reasons: string[] = [];
 
-      // Q♠ - highest priority dump!
-      if (isQueenOfSpades(card)) {
-        score += DUMP_SCORES.QUEEN_OF_SPADES;
-        reasons.push("Dump Q♠!");
-      }
-
-      // Hearts - dump high ones first
-      if (isHeart(card)) {
+      // Penalty cards - dump based on their point value
+      if (card.points > 0) {
+        // Higher points = more urgent to dump
+        // Q♠ (13 pts) gets ~200+, hearts (1 pt) get ~53+
         score +=
           DUMP_SCORES.HEART_BASE +
-          card.rank * DUMP_SCORES.HEART_RANK_MULTIPLIER;
-        reasons.push("Dump heart");
+          card.points * DUMP_SCORES.HEART_RANK_MULTIPLIER;
+        reasons.push(`Dump ${card.points} pt card`);
       }
 
-      // Other high cards
-      if (card.rank >= RANK.HIGH_THRESHOLD && !isPenaltyCard(card)) {
+      // Other high cards (non-penalty)
+      if (card.rank >= RANK.HIGH_THRESHOLD && card.points === 0) {
         score += card.rank * DUMP_SCORES.HIGH_CARD_RANK_MULTIPLIER;
         reasons.push("Dump high card");
       }

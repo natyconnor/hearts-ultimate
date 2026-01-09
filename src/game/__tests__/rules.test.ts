@@ -19,10 +19,12 @@ import {
   findPlayerWithTwoOfClubs,
   isFirstTrick,
 } from "../rules";
+import { createCard } from "../deck";
 import type { Card, GameState } from "../../types/game";
 
-// Helper to create a test card
-const card = (suit: Card["suit"], rank: Card["rank"]): Card => ({ suit, rank });
+// Helper to create a test card (uses createCard to include points)
+const card = (suit: Card["suit"], rank: Card["rank"]): Card =>
+  createCard(suit, rank);
 
 // Helper to create a basic game state for testing
 const createTestGameState = (overrides?: Partial<GameState>): GameState => ({
@@ -38,6 +40,7 @@ const createTestGameState = (overrides?: Partial<GameState>): GameState => ({
   roundScores: [0, 0, 0, 0],
   heartsBroken: false,
   roundNumber: 1,
+  currentTrickNumber: 1,
   ...overrides,
 });
 
@@ -342,12 +345,24 @@ describe("rules - isFirstTrick", () => {
     expect(isFirstTrick(state)).toBe(true);
   });
 
-  it("returns false after cards have been played", () => {
+  it("returns true while trick 1 is in progress (some players have played)", () => {
+    // During trick 1, after player 0 plays but before others play
+    // It's still trick 1 - no penalty cards allowed
     const state = createTestGameState();
     state.players[0].hand = Array(12).fill(card("clubs", 2));
     state.players[1].hand = Array(13).fill(card("clubs", 2));
     state.players[2].hand = Array(13).fill(card("clubs", 2));
     state.players[3].hand = Array(13).fill(card("clubs", 2));
+
+    expect(isFirstTrick(state)).toBe(true);
+  });
+
+  it("returns false after trick 1 completes (all players have 12 cards)", () => {
+    const state = createTestGameState({ currentTrickNumber: 2 });
+    state.players = state.players.map((p) => ({
+      ...p,
+      hand: Array(12).fill(card("clubs", 2)),
+    }));
 
     expect(isFirstTrick(state)).toBe(false);
   });

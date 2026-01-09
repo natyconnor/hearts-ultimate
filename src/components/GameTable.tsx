@@ -1,7 +1,12 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { CardHand } from "./CardHand";
 import { Card } from "./Card";
-import type { Card as CardType, Player, GameState } from "../types/game";
+import type {
+  Card as CardType,
+  Player,
+  GameState,
+  AIDifficulty,
+} from "../types/game";
 import { cn } from "../lib/utils";
 import { getValidCards, isFirstTrick, isTwoOfClubs } from "../game/rules";
 import {
@@ -58,6 +63,29 @@ export function GameTable({
           isFirstTrick(gameState)
         )
       : [];
+
+  // Helper function to get difficulty badge info
+  const getDifficultyBadge = (difficulty: AIDifficulty | undefined) => {
+    if (!difficulty) return null;
+    const badges = {
+      easy: {
+        icon: "🌱",
+        label: "Easy",
+        color: "bg-green-500/20 border-green-500/40 text-green-200",
+      },
+      medium: {
+        icon: "⚡",
+        label: "Medium",
+        color: "bg-yellow-500/20 border-yellow-500/40 text-yellow-200",
+      },
+      hard: {
+        icon: "🧠",
+        label: "Hard",
+        color: "bg-purple-500/20 border-purple-500/40 text-purple-200",
+      },
+    };
+    return badges[difficulty];
+  };
 
   // Determine which trick to display (current or last completed)
   const displayTrick =
@@ -311,23 +339,50 @@ export function GameTable({
                   }
                   selectedCard={selectedCard}
                 />
-                <div
-                  className={cn(
-                    "text-white font-semibold text-sm md:text-lg mt-1 md:mt-2 px-3 md:px-4 py-1 rounded-full transition-all",
-                    gameState?.currentPlayerIndex === 0
-                      ? "bg-yellow-500/80 shadow-[0_0_12px_rgba(234,179,8,0.6)]"
-                      : gameState?.trickLeaderIndex === 0
-                      ? "bg-emerald-500/80 shadow-[0_0_12px_rgba(16,185,129,0.6)]"
-                      : "bg-black/30"
-                  )}
-                >
-                  {getPlayerAtPosition(0)?.name}
-                  {getPlayerAtPosition(0)?.isAI && " 🤖"}
-                  {currentPlayerIndex === 0 && " (You)"}
-                  {gameState?.currentPlayerIndex === 0 && " - Your Turn"}
-                  {gameState?.trickLeaderIndex === 0 &&
-                    gameState?.currentPlayerIndex !== 0 &&
-                    " 👑"}
+                <div className="flex flex-col items-center gap-1">
+                  <div
+                    className={cn(
+                      "text-white font-semibold text-sm md:text-lg px-3 md:px-4 py-1 rounded-full transition-all",
+                      gameState?.currentPlayerIndex === 0
+                        ? "bg-yellow-500/80 shadow-[0_0_12px_rgba(234,179,8,0.6)]"
+                        : gameState?.trickLeaderIndex === 0
+                        ? "bg-emerald-500/80 shadow-[0_0_12px_rgba(16,185,129,0.6)]"
+                        : "bg-black/30"
+                    )}
+                  >
+                    {getPlayerAtPosition(0)?.name}
+                    {getPlayerAtPosition(0)?.isAI && " 🤖"}
+                    {currentPlayerIndex === 0 && " (You)"}
+                    {gameState?.currentPlayerIndex === 0 && " - Your Turn"}
+                    {gameState?.trickLeaderIndex === 0 &&
+                      gameState?.currentPlayerIndex !== 0 &&
+                      " 👑"}
+                  </div>
+                  {getPlayerAtPosition(0)?.isAI &&
+                    getDifficultyBadge(getPlayerAtPosition(0)?.difficulty) && (
+                      <div
+                        className={cn(
+                          "flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium backdrop-blur-sm border shadow-lg",
+                          getDifficultyBadge(getPlayerAtPosition(0)?.difficulty)
+                            ?.color
+                        )}
+                      >
+                        <span>
+                          {
+                            getDifficultyBadge(
+                              getPlayerAtPosition(0)?.difficulty
+                            )?.icon
+                          }
+                        </span>
+                        <span>
+                          {
+                            getDifficultyBadge(
+                              getPlayerAtPosition(0)?.difficulty
+                            )?.label
+                          }
+                        </span>
+                      </div>
+                    )}
                 </div>
                 {gameState && (
                   <div className="text-white/80 text-xs mt-1">
@@ -343,21 +398,48 @@ export function GameTable({
           <div className="absolute top-2 md:top-4 left-1/2 transform -translate-x-1/2">
             {getPlayerAtPosition(2) && (
               <div className="flex flex-col items-center gap-1 md:gap-2">
-                <div
-                  className={cn(
-                    "text-white font-semibold text-xs md:text-sm px-2 md:px-3 py-0.5 md:py-1 rounded-full transition-all",
-                    gameState?.currentPlayerIndex === 2
-                      ? "bg-yellow-500/80 shadow-[0_0_12px_rgba(234,179,8,0.6)]"
-                      : gameState?.trickLeaderIndex === 2
-                      ? "bg-emerald-500/80 shadow-[0_0_12px_rgba(16,185,129,0.6)]"
-                      : "bg-black/30"
-                  )}
-                >
-                  {getPlayerAtPosition(2)?.name}
-                  {getPlayerAtPosition(2)?.isAI && " 🤖"}
-                  {gameState?.trickLeaderIndex === 2 &&
-                    gameState?.currentPlayerIndex !== 2 &&
-                    " 👑"}
+                <div className="flex flex-col items-center gap-1">
+                  <div
+                    className={cn(
+                      "text-white font-semibold text-xs md:text-sm px-2 md:px-3 py-0.5 md:py-1 rounded-full transition-all",
+                      gameState?.currentPlayerIndex === 2
+                        ? "bg-yellow-500/80 shadow-[0_0_12px_rgba(234,179,8,0.6)]"
+                        : gameState?.trickLeaderIndex === 2
+                        ? "bg-emerald-500/80 shadow-[0_0_12px_rgba(16,185,129,0.6)]"
+                        : "bg-black/30"
+                    )}
+                  >
+                    {getPlayerAtPosition(2)?.name}
+                    {getPlayerAtPosition(2)?.isAI && " 🤖"}
+                    {gameState?.trickLeaderIndex === 2 &&
+                      gameState?.currentPlayerIndex !== 2 &&
+                      " 👑"}
+                  </div>
+                  {getPlayerAtPosition(2)?.isAI &&
+                    getDifficultyBadge(getPlayerAtPosition(2)?.difficulty) && (
+                      <div
+                        className={cn(
+                          "flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium backdrop-blur-sm border shadow-lg",
+                          getDifficultyBadge(getPlayerAtPosition(2)?.difficulty)
+                            ?.color
+                        )}
+                      >
+                        <span>
+                          {
+                            getDifficultyBadge(
+                              getPlayerAtPosition(2)?.difficulty
+                            )?.icon
+                          }
+                        </span>
+                        <span>
+                          {
+                            getDifficultyBadge(
+                              getPlayerAtPosition(2)?.difficulty
+                            )?.label
+                          }
+                        </span>
+                      </div>
+                    )}
                 </div>
                 {gameState && (
                   <div className="text-white/70 text-xs mt-0.5">
@@ -391,21 +473,48 @@ export function GameTable({
           <div className="absolute left-2 md:left-4 top-1/2 transform -translate-y-1/2">
             {getPlayerAtPosition(1) && (
               <div className="flex flex-col items-center gap-1 md:gap-2">
-                <div
-                  className={cn(
-                    "text-white font-semibold text-xs md:text-sm px-2 md:px-3 py-0.5 md:py-1 rounded-full whitespace-nowrap transition-all",
-                    gameState?.currentPlayerIndex === 1
-                      ? "bg-yellow-500/80 shadow-[0_0_12px_rgba(234,179,8,0.6)]"
-                      : gameState?.trickLeaderIndex === 1
-                      ? "bg-emerald-500/80 shadow-[0_0_12px_rgba(16,185,129,0.6)]"
-                      : "bg-black/30"
-                  )}
-                >
-                  {getPlayerAtPosition(1)?.name}
-                  {getPlayerAtPosition(1)?.isAI && " 🤖"}
-                  {gameState?.trickLeaderIndex === 1 &&
-                    gameState?.currentPlayerIndex !== 1 &&
-                    " 👑"}
+                <div className="flex flex-col items-center gap-1">
+                  <div
+                    className={cn(
+                      "text-white font-semibold text-xs md:text-sm px-2 md:px-3 py-0.5 md:py-1 rounded-full whitespace-nowrap transition-all",
+                      gameState?.currentPlayerIndex === 1
+                        ? "bg-yellow-500/80 shadow-[0_0_12px_rgba(234,179,8,0.6)]"
+                        : gameState?.trickLeaderIndex === 1
+                        ? "bg-emerald-500/80 shadow-[0_0_12px_rgba(16,185,129,0.6)]"
+                        : "bg-black/30"
+                    )}
+                  >
+                    {getPlayerAtPosition(1)?.name}
+                    {getPlayerAtPosition(1)?.isAI && " 🤖"}
+                    {gameState?.trickLeaderIndex === 1 &&
+                      gameState?.currentPlayerIndex !== 1 &&
+                      " 👑"}
+                  </div>
+                  {getPlayerAtPosition(1)?.isAI &&
+                    getDifficultyBadge(getPlayerAtPosition(1)?.difficulty) && (
+                      <div
+                        className={cn(
+                          "flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium backdrop-blur-sm border shadow-lg",
+                          getDifficultyBadge(getPlayerAtPosition(1)?.difficulty)
+                            ?.color
+                        )}
+                      >
+                        <span>
+                          {
+                            getDifficultyBadge(
+                              getPlayerAtPosition(1)?.difficulty
+                            )?.icon
+                          }
+                        </span>
+                        <span>
+                          {
+                            getDifficultyBadge(
+                              getPlayerAtPosition(1)?.difficulty
+                            )?.label
+                          }
+                        </span>
+                      </div>
+                    )}
                 </div>
                 {gameState && (
                   <div className="text-white/70 text-xs mt-0.5">
@@ -439,21 +548,48 @@ export function GameTable({
           <div className="absolute right-2 md:right-4 top-1/2 transform -translate-y-1/2">
             {getPlayerAtPosition(3) && (
               <div className="flex flex-col items-center gap-1 md:gap-2">
-                <div
-                  className={cn(
-                    "text-white font-semibold text-xs md:text-sm px-2 md:px-3 py-0.5 md:py-1 rounded-full whitespace-nowrap transition-all",
-                    gameState?.currentPlayerIndex === 3
-                      ? "bg-yellow-500/80 shadow-[0_0_12px_rgba(234,179,8,0.6)]"
-                      : gameState?.trickLeaderIndex === 3
-                      ? "bg-emerald-500/80 shadow-[0_0_12px_rgba(16,185,129,0.6)]"
-                      : "bg-black/30"
-                  )}
-                >
-                  {getPlayerAtPosition(3)?.name}
-                  {getPlayerAtPosition(3)?.isAI && " 🤖"}
-                  {gameState?.trickLeaderIndex === 3 &&
-                    gameState?.currentPlayerIndex !== 3 &&
-                    " 👑"}
+                <div className="flex flex-col items-center gap-1">
+                  <div
+                    className={cn(
+                      "text-white font-semibold text-xs md:text-sm px-2 md:px-3 py-0.5 md:py-1 rounded-full whitespace-nowrap transition-all",
+                      gameState?.currentPlayerIndex === 3
+                        ? "bg-yellow-500/80 shadow-[0_0_12px_rgba(234,179,8,0.6)]"
+                        : gameState?.trickLeaderIndex === 3
+                        ? "bg-emerald-500/80 shadow-[0_0_12px_rgba(16,185,129,0.6)]"
+                        : "bg-black/30"
+                    )}
+                  >
+                    {getPlayerAtPosition(3)?.name}
+                    {getPlayerAtPosition(3)?.isAI && " 🤖"}
+                    {gameState?.trickLeaderIndex === 3 &&
+                      gameState?.currentPlayerIndex !== 3 &&
+                      " 👑"}
+                  </div>
+                  {getPlayerAtPosition(3)?.isAI &&
+                    getDifficultyBadge(getPlayerAtPosition(3)?.difficulty) && (
+                      <div
+                        className={cn(
+                          "flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium backdrop-blur-sm border shadow-lg",
+                          getDifficultyBadge(getPlayerAtPosition(3)?.difficulty)
+                            ?.color
+                        )}
+                      >
+                        <span>
+                          {
+                            getDifficultyBadge(
+                              getPlayerAtPosition(3)?.difficulty
+                            )?.icon
+                          }
+                        </span>
+                        <span>
+                          {
+                            getDifficultyBadge(
+                              getPlayerAtPosition(3)?.difficulty
+                            )?.label
+                          }
+                        </span>
+                      </div>
+                    )}
                 </div>
                 {gameState && (
                   <div className="text-white/70 text-xs mt-0.5">

@@ -18,7 +18,16 @@ export interface AIDebugLog {
     voidSuits?: Record<string, string[]>;
     cardsRememberedCount?: number;
     moonShooterCandidate?: string | null;
+    // Moon shooting attempt tracking
+    attemptingMoon?: boolean;
+    moonConfidence?: number;
+    moonReasons?: string[];
+    // Memory stats (from CardMemory.getSnapshot())
+    cardsTracked?: number;
+    tricksCounted?: number;
+    voidPlayers?: string[];
   };
+  aiVersion: number; // Version of AI code that generated this log
 }
 
 interface AIDebugStore {
@@ -42,10 +51,11 @@ export const useAIDebugStore = create<AIDebugStore>((set) => ({
           timestamp: Date.now(),
         },
         ...state.logs,
-      ].slice(0, 50), // Keep last 50 logs to prevent memory issues
+      ],
+      // No cap - allow full game logs to be copied
+      // In practice, a full game might generate ~200-400 logs (52 cards + passing phases)
     })),
   clearLogs: () => set({ logs: [] }),
   toggleOpen: () => set((state) => ({ isOpen: !state.isOpen })),
   setOpen: (isOpen) => set({ isOpen }),
 }));
-

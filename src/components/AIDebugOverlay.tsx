@@ -1,6 +1,7 @@
 import { useAIDebugStore } from "../store/aiDebugStore";
 import { formatCard } from "../game/cardDisplay";
 import { cn } from "../lib/utils";
+import { AI_VERSION } from "../lib/ai/types";
 import {
   X,
   ChevronDown,
@@ -47,9 +48,14 @@ export function AIDebugOverlay() {
       <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900">
         <div className="flex items-center gap-2 text-emerald-400">
           <Activity className="w-4 h-4" />
-          <h2 className="font-bold text-sm uppercase tracking-wider">
-            AI Logic Inspector
-          </h2>
+          <div className="flex flex-col">
+            <h2 className="font-bold text-sm uppercase tracking-wider">
+              AI Logic Inspector
+            </h2>
+            <span className="text-[10px] text-slate-400 font-normal">
+              AI Version {AI_VERSION}
+            </span>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -234,8 +240,12 @@ function LogItem({
  * Formats logs into a token-efficient text format for LLM analysis
  */
 function formatLogsForLLM(logs: AIDebugLog[]): string {
+  // Get AI version from logs (should be consistent, but use first log's version)
+  const aiVersion = logs.length > 0 ? logs[0].aiVersion : AI_VERSION;
+
   const header = `HEARTS AI GAME LOGS
 Generated: ${new Date().toISOString()}
+AI Version: ${aiVersion}
 Format: [Round|Player|Diff|Action] Context -> Decision | (Alternatives...) | {Memory}
 --------------------------------------------------------------------------------`;
 

@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { chooseAICardsToPass, chooseAICard } from "../ai";
+import { createCard } from "../../game/deck";
 import type { Card, GameState } from "../../types/game";
 
-const card = (suit: Card["suit"], rank: Card["rank"]): Card => ({ suit, rank });
+const card = (suit: Card["suit"], rank: Card["rank"]): Card =>
+  createCard(suit, rank);
 
 const createTestGameState = (
   hand: Card[],
@@ -48,6 +50,7 @@ const createTestGameState = (
   roundScores: [0, 0, 0, 0],
   heartsBroken: false,
   roundNumber: 1,
+  currentTrickNumber: 1,
   currentPlayerIndex: 0,
   passDirection: "left",
   ...overrides,
@@ -147,6 +150,7 @@ describe("AI Module - chooseAICard", () => {
     const state = createTestGameState(hand, {
       currentTrick: [],
       heartsBroken: true, // Allow leading hearts
+      currentTrickNumber: 2, // Not first trick
     });
 
     const chosen = chooseAICard(state, 0);

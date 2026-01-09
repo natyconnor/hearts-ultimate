@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Trophy, Home, RotateCcw } from "lucide-react";
-import type { Player } from "../types/game";
+import type { Player, AIDifficulty } from "../types/game";
 import { cn } from "../lib/utils";
 import {
   buttonClasses,
@@ -35,6 +35,29 @@ export function GameEndOverlay({
     .sort((a, b) => a.score - b.score);
 
   const winner = players[winnerIndex];
+
+  // Helper function to get difficulty badge info
+  const getDifficultyBadge = (difficulty: AIDifficulty | undefined) => {
+    if (!difficulty) return null;
+    const badges = {
+      easy: {
+        icon: "🌱",
+        label: "Easy",
+        color: "bg-green-500/20 border-green-500/40 text-green-200",
+      },
+      medium: {
+        icon: "⚡",
+        label: "Medium",
+        color: "bg-yellow-500/20 border-yellow-500/40 text-yellow-200",
+      },
+      hard: {
+        icon: "🧠",
+        label: "Hard",
+        color: "bg-purple-500/20 border-purple-500/40 text-purple-200",
+      },
+    };
+    return badges[difficulty];
+  };
 
   return (
     <motion.div
@@ -125,10 +148,27 @@ export function GameEndOverlay({
                     </span>
                     <span className="font-medium text-white">
                       {item.player.name}
-                      {item.player.isAI && (
-                        <span className="ml-1 text-white/60">🤖</span>
-                      )}
                     </span>
+                    {item.player.isAI && (
+                      <>
+                        <span className="text-white/60">🤖</span>
+                        {getDifficultyBadge(item.player.difficulty) && (
+                          <div
+                            className={cn(
+                              "flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium backdrop-blur-sm border",
+                              getDifficultyBadge(item.player.difficulty)?.color
+                            )}
+                            title={
+                              getDifficultyBadge(item.player.difficulty)?.label
+                            }
+                          >
+                            <span>
+                              {getDifficultyBadge(item.player.difficulty)?.icon}
+                            </span>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                   <span
                     className={cn(

@@ -1,8 +1,13 @@
-import { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useState, useEffect, useRef, useMemo } from "react";
+import {
+  useParams,
+  useNavigate,
+  Link,
+  useSearchParams,
+} from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { AnimatePresence } from "framer-motion";
-import { Home } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Home, ChevronDown } from "lucide-react";
 import { cn } from "../lib/utils";
 import {
   getRoomBySlug,
@@ -15,8 +20,16 @@ import { useRoomNavigationBlocker } from "../hooks/useRoomNavigationBlocker";
 import { usePageUnloadWarning } from "../hooks/usePageUnloadWarning";
 import { useGameStore } from "../store/gameStore";
 import { STORAGE_KEYS } from "../lib/constants";
-import { createAIPlayersToFillSlots } from "../lib/aiPlayers";
-import { chooseAICard, chooseAICardsToPass } from "../lib/ai";
+import {
+  createAIPlayersToFillSlots,
+  getDifficultyDisplayName,
+} from "../lib/aiPlayers";
+import {
+  chooseAICard,
+  chooseAICardsToPass,
+  notifyTrickComplete,
+  resetAIForNewRound,
+} from "../lib/ai";
 import { createAndDeal } from "../game/deck";
 import {
   prepareNewRound,
@@ -40,6 +53,7 @@ import { RoundSummaryOverlay } from "../components/RoundSummaryOverlay";
 import { PassingPhaseOverlay } from "../components/PassingPhaseOverlay";
 import { ReceivedCardsOverlay } from "../components/ReceivedCardsOverlay";
 import { AIDebugOverlay } from "../components/AIDebugOverlay";
+import { useAIDebugStore } from "../store/aiDebugStore";
 import { playSound } from "../lib/sounds";
 import type {
   GameState,
@@ -48,8 +62,35 @@ import type {
   AIDifficulty,
 } from "../types/game";
 
+const DIFFICULTY_OPTIONS: {
+  value: AIDifficulty;
+  label: string;
+  description: string;
+  icon: string;
+}[] = [
+  {
+    value: "easy",
+    label: "Easy",
+    description: "Simple AI that plays basic cards",
+    icon: "🌱",
+  },
+  {
+    value: "medium",
+    label: "Medium",
+    description: "Strategic AI that avoids penalties",
+    icon: "⚡",
+  },
+  {
+    value: "hard",
+    label: "Hard",
+    description: "Expert AI with card counting",
+    icon: "🧠",
+  },
+];
+
 export function GameRoom() {
   const { slug } = useParams<{ slug: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const {
@@ -70,6 +111,9 @@ export function GameRoom() {
   const [showGameEnd, setShowGameEnd] = useState(false);
   const [selectedCardsToPass, setSelectedCardsToPass] = useState<CardType[]>(
     []
+  );
+  const [openDifficultyMenu, setOpenDifficultyMenu] = useState<string | null>(
+    null
   );
   const cardHandRef = useRef<HTMLDivElement>(null);
   // Use refs for animation state to avoid closure issues in useEffect
@@ -104,8 +148,16 @@ export function GameRoom() {
   }, [clearCurrentRoom]);
 
   const currentGameState = gameState ?? room?.gameState ?? null;
-  const players = currentGameState?.players ?? [];
+  const players = useMemo(
+    () => currentGameState?.players ?? [],
+    [currentGameState?.players]
+  );
   const roomStatus = currentRoom.status ?? room?.status ?? "waiting";
+
+  // Test mode: enabled via URL param or if all players are AI
+  const isTestMode =
+    searchParams.get("test") === "true" ||
+    (players.length === 4 && players.every((p) => p.isAI));
 
   const currentPlayer = currentPlayerId
     ? players.find((p) => p.id === currentPlayerId) ?? null
@@ -125,6 +177,23 @@ export function GameRoom() {
     roomStatus,
     enabled: !!(slug && room && currentPlayerId),
   });
+
+  // Close difficulty menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest("[data-difficulty-menu]")) {
+        setOpenDifficultyMenu(null);
+      }
+    };
+
+    if (openDifficultyMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+      };
+    }
+  }, [openDifficultyMenu]);
 
   const joinRoomMutation = useMutation({
     mutationFn: async (playerName: string) => {
@@ -183,11 +252,8 @@ export function GameRoom() {
       if (currentGameState.players.length >= 4)
         throw new Error("Room is already full");
 
-      // Get AI difficulty from localStorage
-      const storedDifficulty = localStorage.getItem(
-        STORAGE_KEYS.AI_DIFFICULTY
-      ) as AIDifficulty | null;
-      const difficulty: AIDifficulty = storedDifficulty || "easy";
+      // Default to medium difficulty
+      const difficulty: AIDifficulty = "medium";
 
       const newAIPlayers = createAIPlayersToFillSlots(
         currentGameState.players,
@@ -196,6 +262,49 @@ export function GameRoom() {
       const updatedGameState: GameState = {
         ...currentGameState,
         players: [...currentGameState.players, ...newAIPlayers],
+      };
+
+      await updateRoomGameState(slug, updatedGameState);
+
+      return updatedGameState;
+    },
+    onSuccess: (updatedGameState) => {
+      updateGameState(updatedGameState);
+      queryClient.invalidateQueries({ queryKey: ["room", slug] });
+    },
+  });
+
+  const updateAIDifficultyMutation = useMutation({
+    mutationFn: async ({
+      playerId,
+      difficulty,
+    }: {
+      playerId: string;
+      difficulty: AIDifficulty;
+    }) => {
+      if (!slug || !room) throw new Error("Room not found");
+      const currentGameState = gameState ?? room.gameState;
+      const roomStatus = currentRoom.status ?? room.status;
+
+      if (roomStatus !== "waiting")
+        throw new Error("Cannot change difficulty after game started");
+
+      const playerIndex = currentGameState.players.findIndex(
+        (p) => p.id === playerId
+      );
+      if (playerIndex === -1) throw new Error("Player not found");
+      if (!currentGameState.players[playerIndex].isAI)
+        throw new Error("Can only change difficulty for AI players");
+
+      const updatedPlayers = [...currentGameState.players];
+      updatedPlayers[playerIndex] = {
+        ...updatedPlayers[playerIndex],
+        difficulty,
+      };
+
+      const updatedGameState: GameState = {
+        ...currentGameState,
+        players: updatedPlayers,
       };
 
       await updateRoomGameState(slug, updatedGameState);
@@ -233,6 +342,9 @@ export function GameRoom() {
 
       // Start round with passing phase (or play if direction is "none")
       updatedGameState = startRoundWithPassingPhase(updatedGameState, hands);
+
+      // Reset AI memory for the new round
+      resetAIForNewRound(updatedGameState);
 
       // Process AI passes immediately (they don't need to "think")
       if (updatedGameState.isPassingPhase) {
@@ -310,6 +422,9 @@ export function GameRoom() {
 
       // Prepare the new round with dealt cards
       let updatedGameState = prepareNewRound(currentGameState, newHands);
+
+      // Reset AI memory for the new round
+      resetAIForNewRound(updatedGameState);
 
       // Process AI passes immediately if in passing phase
       if (updatedGameState.isPassingPhase) {
@@ -422,10 +537,51 @@ export function GameRoom() {
       setShowGameEnd(false);
       showGameEndRef.current = false;
       setSelectedCardsToPass([]); // Reset pass selection for new game
+      // Clear logs when starting new game in test mode
+      // Check test mode via search params or if all players are AI
+      const currentPlayers = updatedGameState.players;
+      const isInTestMode =
+        searchParams.get("test") === "true" ||
+        (currentPlayers.length === 4 && currentPlayers.every((p) => p.isAI));
+      if (isInTestMode) {
+        useAIDebugStore.getState().clearLogs();
+      }
       updateGameState(updatedGameState);
       queryClient.invalidateQueries({ queryKey: ["room", slug] });
     },
   });
+
+  // Auto-advance round summary in test mode
+  useEffect(() => {
+    if (isTestMode && showRoundSummary && !nextRoundMutation.isPending) {
+      const timeoutId = setTimeout(() => {
+        nextRoundMutation.mutate();
+      }, 500); // Brief delay to see the summary
+      return () => clearTimeout(timeoutId);
+    }
+  }, [showRoundSummary, isTestMode, nextRoundMutation]);
+
+  // In test mode, game end stops and requires button press (logs preserved for copying)
+
+  // Auto-start game when 4 AI players are added in test mode
+  const allPlayersAreAI = useMemo(
+    () => players.length === 4 && players.every((p) => p.isAI),
+    [players]
+  );
+
+  useEffect(() => {
+    if (
+      isTestMode &&
+      roomStatus === "waiting" &&
+      allPlayersAreAI &&
+      !startGameMutation.isPending
+    ) {
+      const timeoutId = setTimeout(() => {
+        startGameMutation.mutate();
+      }, 500); // Brief delay after adding players
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isTestMode, roomStatus, allPlayersAreAI, startGameMutation]);
 
   // Handle toggling a card for passing
   const handlePassCardToggle = (card: CardType) => {
@@ -546,13 +702,15 @@ export function GameRoom() {
       queryClient.invalidateQueries({ queryKey: ["room", slug] });
       setSelectedCard(null);
 
-      // Play card sound
-      playSound("cardPlay");
+      // Play card sound (skip in test mode)
+      if (!isTestMode) {
+        playSound("cardPlay");
 
-      // Check if hearts just broke (compare with previous state)
-      const prevHeartsBroken = currentGameState?.heartsBroken ?? false;
-      if (!prevHeartsBroken && updatedGameState.heartsBroken) {
-        setTimeout(() => playSound("heartsBroken"), 200);
+        // Check if hearts just broke (compare with previous state)
+        const prevHeartsBroken = currentGameState?.heartsBroken ?? false;
+        if (!prevHeartsBroken && updatedGameState.heartsBroken) {
+          setTimeout(() => playSound("heartsBroken"), 200);
+        }
       }
 
       // 2. Determine if a trick or round just finished
@@ -562,44 +720,69 @@ export function GameRoom() {
         updatedGameState.currentTrick.length === 0;
 
       if (trickJustCompleted) {
-        // Play trick win sound
-        setTimeout(() => playSound("trickWin"), 400);
+        // Notify AI systems about the completed trick (for memory updates)
+        // The trick number that just completed is currentTrickNumber - 1 (since we already incremented)
+        const completedTrickNumber =
+          (updatedGameState.currentTrickNumber ?? 1) - 1;
+        notifyTrickComplete(
+          updatedGameState,
+          updatedGameState.lastCompletedTrick!,
+          updatedGameState.lastTrickWinnerIndex!,
+          completedTrickNumber
+        );
+        // In test mode, skip animations and sounds
+        if (isTestMode) {
+          // Skip animations, just check for round/game end
+          if (
+            updatedGameState.isGameOver &&
+            updatedGameState.winnerIndex !== undefined
+          ) {
+            setShowGameEnd(true);
+            showGameEndRef.current = true;
+          } else if (updatedGameState.isRoundComplete) {
+            setShowRoundSummary(true);
+            showRoundSummaryRef.current = true;
+          }
+        } else {
+          // Play trick win sound
+          setTimeout(() => playSound("trickWin"), 400);
 
-        // Show the completed trick with winner highlight
-        setShowCompletedTrick(true);
-        setAnimatingToWinner(false);
-        isAnimatingRef.current = true;
+          // Show the completed trick with winner highlight
+          setShowCompletedTrick(true);
+          setAnimatingToWinner(false);
+          isAnimatingRef.current = true;
 
-        // Sequence: Show trick (600ms) -> Animate to winner (1000ms) -> Show summary
-        setTimeout(() => {
-          setAnimatingToWinner(true);
-
+          // Sequence: Show trick (600ms) -> Animate to winner (1000ms) -> Show summary
           setTimeout(() => {
-            setShowCompletedTrick(false);
-            setAnimatingToWinner(false);
-            isAnimatingRef.current = false;
+            setAnimatingToWinner(true);
 
-            // Final state check - use the mutation result as source of truth
-            if (
-              updatedGameState.isGameOver &&
-              updatedGameState.winnerIndex !== undefined
-            ) {
-              playSound("gameEnd");
-              setShowGameEnd(true);
-              showGameEndRef.current = true;
-            } else if (updatedGameState.isRoundComplete) {
-              // Check for shooting the moon
-              const moonCheck = checkShootingTheMoon(
-                updatedGameState.roundScores
-              );
-              if (moonCheck.shot) {
-                playSound("shootTheMoon");
+            setTimeout(() => {
+              setShowCompletedTrick(false);
+              setAnimatingToWinner(false);
+              isAnimatingRef.current = false;
+
+              // Final state check - use the mutation result as source of truth
+              if (
+                updatedGameState.isGameOver &&
+                updatedGameState.winnerIndex !== undefined
+              ) {
+                playSound("gameEnd");
+                setShowGameEnd(true);
+                showGameEndRef.current = true;
+              } else if (updatedGameState.isRoundComplete) {
+                // Check for shooting the moon
+                const moonCheck = checkShootingTheMoon(
+                  updatedGameState.roundScores
+                );
+                if (moonCheck.shot) {
+                  playSound("shootTheMoon");
+                }
+                setShowRoundSummary(true);
+                showRoundSummaryRef.current = true;
               }
-              setShowRoundSummary(true);
-              showRoundSummaryRef.current = true;
-            }
-          }, 1000);
-        }, 600);
+            }, 1000);
+          }, 600);
+        }
       }
     },
   });
@@ -633,7 +816,9 @@ export function GameRoom() {
     const currentPlayer = currentGameState.players[currentPlayerIndex];
     if (!currentPlayer.isAI) return;
 
-    // Small delay for realism (AI "thinking")
+    // In test mode, skip delays for fast playthrough
+    const delay = isTestMode ? 50 : 800;
+
     const timeoutId = setTimeout(() => {
       // Double-check conditions haven't changed
       const latestState = gameState ?? room?.gameState;
@@ -642,9 +827,10 @@ export function GameRoom() {
         latestState.currentPlayerIndex !== currentPlayerIndex ||
         latestState.players[currentPlayerIndex]?.id !== currentPlayer.id ||
         playCardMutation.isPending ||
-        isAnimatingRef.current ||
-        showRoundSummaryRef.current ||
-        showGameEndRef.current
+        (!isTestMode &&
+          (isAnimatingRef.current ||
+            showRoundSummaryRef.current ||
+            showGameEndRef.current))
       ) {
         return;
       }
@@ -654,7 +840,7 @@ export function GameRoom() {
         card: chosenCard,
         playerId: currentPlayer.id,
       });
-    }, 800);
+    }, delay);
 
     return () => clearTimeout(timeoutId);
   }, [
@@ -668,6 +854,7 @@ export function GameRoom() {
     animatingToWinner,
     showRoundSummary,
     showGameEnd,
+    isTestMode,
   ]);
 
   const handleCardClick = (card: CardType) => {
@@ -707,8 +894,8 @@ export function GameRoom() {
     );
   }
 
-  // Show game table when playing
-  if (roomStatus === "playing") {
+  // Show game table when playing or when game just finished (to show GameEndOverlay)
+  if (roomStatus === "playing" || (roomStatus === "finished" && showGameEnd)) {
     return (
       <div className="flex flex-col h-screen w-full overflow-hidden bg-gradient-to-b from-gray-800 to-gray-900">
         <header className="relative z-50 flex-shrink-0 bg-black/40 backdrop-blur-md border-b border-white/10">
@@ -792,15 +979,7 @@ export function GameRoom() {
               roundNumber={currentGameState.roundNumber}
               roundScores={currentGameState.roundScores}
               totalScores={currentGameState.scores}
-              shotTheMoon={
-                checkShootingTheMoon(currentGameState.roundScores).shot
-                  ? {
-                      playerIndex: checkShootingTheMoon(
-                        currentGameState.roundScores
-                      ).playerIndex!,
-                    }
-                  : null
-              }
+              shotTheMoon={currentGameState.shotTheMoon}
               pointsCardsTaken={currentGameState.pointsCardsTaken}
               onNextRound={() => nextRoundMutation.mutate()}
               isLoading={nextRoundMutation.isPending}
@@ -928,6 +1107,9 @@ export function GameRoom() {
             {[0, 1, 2, 3].map((index) => {
               const player = players[index];
               const isCurrentPlayer = player?.id === currentPlayerId;
+              const isAI = player?.isAI ?? false;
+              const currentDifficulty = player?.difficulty ?? "medium";
+              const isMenuOpen = openDifficultyMenu === player?.id;
               return (
                 <div
                   key={index}
@@ -941,22 +1123,122 @@ export function GameRoom() {
                   )}
                 >
                   {player ? (
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-semibold">
-                          {player.name}
-                          {player.isAI && (
-                            <span className="ml-2 text-xs text-gray-500">
-                              (AI)
-                            </span>
-                          )}
-                        </div>
-                        {isCurrentPlayer && (
-                          <div className="text-sm text-poker-green font-medium">
-                            You
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-semibold">
+                            {player.name}
+                            {isAI && (
+                              <span className="ml-2 text-xs text-gray-500">
+                                (AI)
+                              </span>
+                            )}
+                            {isCurrentPlayer && (
+                              <span className="ml-2 text-xs text-gray-500">
+                                (You)
+                              </span>
+                            )}
                           </div>
-                        )}
+                        </div>
                       </div>
+                      {isAI && roomStatus === "waiting" && (
+                        <div className="relative" data-difficulty-menu>
+                          <button
+                            onClick={() =>
+                              setOpenDifficultyMenu(
+                                isMenuOpen ? null : player.id
+                              )
+                            }
+                            className={cn(
+                              "w-full flex items-center gap-2 px-3 py-2",
+                              "bg-white/80 hover:bg-white rounded-lg",
+                              "border border-gray-300 hover:border-poker-green",
+                              "transition-all duration-200 text-sm"
+                            )}
+                          >
+                            <span className="text-base">
+                              {
+                                DIFFICULTY_OPTIONS.find(
+                                  (d) => d.value === currentDifficulty
+                                )?.icon
+                              }
+                            </span>
+                            <span className="flex-1 text-left font-medium text-gray-700">
+                              {getDifficultyDisplayName(currentDifficulty)}
+                            </span>
+                            <ChevronDown
+                              className={cn(
+                                "w-4 h-4 text-gray-500 transition-transform",
+                                isMenuOpen && "rotate-180"
+                              )}
+                            />
+                          </button>
+
+                          {/* Dropdown menu */}
+                          <AnimatePresence>
+                            {isMenuOpen && (
+                              <motion.div
+                                initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                                transition={{ duration: 0.15 }}
+                                className={cn(
+                                  "absolute top-full left-0 right-0 mt-1 z-50",
+                                  "bg-white rounded-lg shadow-lg",
+                                  "border border-gray-200 overflow-hidden"
+                                )}
+                              >
+                                {DIFFICULTY_OPTIONS.map((option) => (
+                                  <button
+                                    key={option.value}
+                                    onClick={() => {
+                                      updateAIDifficultyMutation.mutate({
+                                        playerId: player.id,
+                                        difficulty: option.value,
+                                      });
+                                      setOpenDifficultyMenu(null);
+                                    }}
+                                    disabled={
+                                      updateAIDifficultyMutation.isPending
+                                    }
+                                    className={cn(
+                                      "w-full flex items-start gap-3 px-3 py-2.5 text-left",
+                                      "hover:bg-green-50 transition-colors",
+                                      "disabled:opacity-50 disabled:cursor-not-allowed",
+                                      currentDifficulty === option.value &&
+                                        "bg-green-50"
+                                    )}
+                                  >
+                                    <span className="text-lg mt-0.5">
+                                      {option.icon}
+                                    </span>
+                                    <div className="flex-1 min-w-0">
+                                      <div
+                                        className={cn(
+                                          "font-medium text-sm",
+                                          currentDifficulty === option.value
+                                            ? "text-poker-green"
+                                            : "text-gray-700"
+                                        )}
+                                      >
+                                        {option.label}
+                                      </div>
+                                      <div className="text-xs text-gray-500 mt-0.5">
+                                        {option.description}
+                                      </div>
+                                    </div>
+                                    {currentDifficulty === option.value && (
+                                      <span className="text-poker-green mt-1 text-sm">
+                                        ✓
+                                      </span>
+                                    )}
+                                  </button>
+                                ))}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="text-gray-400 italic">Empty Slot</div>

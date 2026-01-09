@@ -11,6 +11,7 @@ const initialGameState: GameState = {
   roundScores: [0, 0, 0, 0],
   heartsBroken: false,
   roundNumber: 1,
+  currentTrickNumber: 1,
   isRoundComplete: false,
   isGameOver: false,
   winnerIndex: undefined,

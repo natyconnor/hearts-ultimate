@@ -9,12 +9,8 @@ import type { Card, GameState, AIDifficulty } from "../../types/game";
 import type { AIStrategy, PlayContext, PassContext } from "./types";
 import { EasyStrategy } from "./strategies/easy";
 import { MediumStrategy } from "./strategies/medium";
-import { HardStrategy } from "./strategies/hard";
-import {
-  getValidCards,
-  getLeadSuit,
-  isFirstTrick,
-} from "../../game/rules";
+import { HardStrategy } from "./strategies/hard/hardStrategy";
+import { getValidCards, getLeadSuit, isFirstTrick } from "../../game/rules";
 
 // Strategy instances (reused across calls)
 const strategies: Record<AIDifficulty, AIStrategy> = {
@@ -29,10 +25,7 @@ const hardAIInstances = new Map<string, HardStrategy>();
 /**
  * Get the appropriate strategy for a player
  */
-function getStrategy(
-  playerId: string,
-  difficulty: AIDifficulty
-): AIStrategy {
+function getStrategy(playerId: string, difficulty: AIDifficulty): AIStrategy {
   if (difficulty === "hard") {
     // Hard AI needs per-player instances for memory
     if (!hardAIInstances.has(playerId)) {
@@ -46,7 +39,10 @@ function getStrategy(
 /**
  * Get the difficulty for an AI player, defaulting to "easy"
  */
-function getPlayerDifficulty(gameState: GameState, playerIndex: number): AIDifficulty {
+function getPlayerDifficulty(
+  gameState: GameState,
+  playerIndex: number
+): AIDifficulty {
   const player = gameState.players[playerIndex];
   return player?.difficulty ?? "easy";
 }
@@ -76,10 +72,7 @@ export function chooseAICardsToPass(
 /**
  * Choose a card to play during the playing phase
  */
-export function chooseAICard(
-  gameState: GameState,
-  playerIndex: number
-): Card {
+export function chooseAICard(gameState: GameState, playerIndex: number): Card {
   const player = gameState.players[playerIndex];
   const difficulty = getPlayerDifficulty(gameState, playerIndex);
   const strategy = getStrategy(player.id, difficulty);
@@ -98,9 +91,11 @@ export function chooseAICard(
   const leadSuit = getLeadSuit(currentTrick);
   const isLeading = currentTrick.length === 0;
 
-  // Calculate tricks played this round (13 cards per player, 4 players)
-  const cardsPlayed = 13 - hand.length;
-  const tricksPlayedThisRound = Math.floor(cardsPlayed);
+  // Calculate tricks played this round from currentTrickNumber
+  // currentTrickNumber is 1-based (trick 1, trick 2, etc.)
+  // tricksPlayedThisRound is 0-based (0 = no tricks completed, 1 = one trick completed, etc.)
+  const currentTrickNumber = gameState.currentTrickNumber ?? 1;
+  const tricksPlayedThisRound = currentTrickNumber - 1;
 
   const context: PlayContext = {
     gameState,
@@ -130,7 +125,7 @@ export function notifyTrickComplete(
     // Only notify if this player is still in the game
     const playerInGame = gameState.players.some((p) => p.id === playerId);
     if (playerInGame && strategy.onTrickComplete) {
-      strategy.onTrickComplete(trick, winnerIndex, trickNumber);
+      strategy.onTrickComplete(trick, winnerIndex, trickNumber, gameState);
     }
   }
 }
@@ -156,5 +151,9 @@ export function clearAIInstances(): void {
 }
 
 // Re-export types
-export type { AIDifficulty, AIStrategy, PlayContext, PassContext } from "./types";
-
+export type {
+  AIDifficulty,
+  AIStrategy,
+  PlayContext,
+  PassContext,
+} from "./types";

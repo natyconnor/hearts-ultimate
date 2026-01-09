@@ -19,7 +19,7 @@ function generateAIPlayerId(): string {
  */
 export function createAIPlayer(
   name: string,
-  difficulty: AIDifficulty = "easy"
+  difficulty: AIDifficulty = "medium"
 ): Player {
   return {
     id: generateAIPlayerId(),
@@ -60,7 +60,7 @@ export function getNextAIName(existingPlayers: Player[]): string {
  */
 export function createAIPlayersToFillSlots(
   existingPlayers: Player[],
-  difficulty: AIDifficulty = "easy"
+  difficulty: AIDifficulty = "medium"
 ): Player[] {
   const slotsToFill = 4 - existingPlayers.length;
   if (slotsToFill <= 0) {

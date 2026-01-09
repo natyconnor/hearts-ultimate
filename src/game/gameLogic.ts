@@ -157,6 +157,10 @@ export function playCard(
         isGameOver: gameOver,
         winnerIndex: gameWinnerIndex,
         pointsCardsTaken: updatedPointsCardsTaken,
+        // Store moon shot info BEFORE scores are adjusted
+        shotTheMoon: moonCheck.shot
+          ? { playerIndex: moonCheck.playerIndex! }
+          : null,
       };
 
       // If game is over, we'll handle status update in the component
@@ -173,6 +177,7 @@ export function playCard(
       roundScores: updatedRoundScores,
       currentPlayerIndex: winnerPlayerIndex,
       trickLeaderIndex: winnerPlayerIndex,
+      currentTrickNumber: (gameState.currentTrickNumber ?? 1) + 1, // Increment trick number
       pointsCardsTaken: updatedPointsCardsTaken,
     };
   } else {
@@ -212,6 +217,7 @@ export function initializeRound(gameState: GameState): GameState {
     lastTrickWinnerIndex: undefined,
     roundScores: [0, 0, 0, 0],
     heartsBroken: false,
+    currentTrickNumber: 1, // Start at trick 1
     isRoundComplete: false,
     isGameOver: false,
     winnerIndex: undefined,
@@ -261,6 +267,7 @@ export function startRoundWithPassingPhase(
     lastTrickWinnerIndex: undefined,
     roundScores: [0, 0, 0, 0],
     heartsBroken: false,
+    currentTrickNumber: 1, // Will start at trick 1 when play begins
     isRoundComplete: false,
     isGameOver: false,
     winnerIndex: undefined,
@@ -361,6 +368,7 @@ export function resetGameForNewGame(
     scores: [0, 0, 0, 0],
     roundScores: [0, 0, 0, 0],
     roundNumber: 1,
+    currentTrickNumber: 1,
     isRoundComplete: false,
     isGameOver: false,
     winnerIndex: undefined,

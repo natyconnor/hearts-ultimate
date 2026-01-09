@@ -13,9 +13,11 @@ import {
   processAIPasses,
   processAIPassesAndFinalize,
 } from "../passingLogic";
+import { createCard } from "../deck";
 import type { Card, GameState } from "../../types/game";
 
-const card = (suit: Card["suit"], rank: Card["rank"]): Card => ({ suit, rank });
+const card = (suit: Card["suit"], rank: Card["rank"]): Card =>
+  createCard(suit, rank);
 
 const createTestGameState = (overrides?: Partial<GameState>): GameState => ({
   players: [
@@ -30,6 +32,7 @@ const createTestGameState = (overrides?: Partial<GameState>): GameState => ({
   roundScores: [0, 0, 0, 0],
   heartsBroken: false,
   roundNumber: 1,
+  currentTrickNumber: 1,
   ...overrides,
 });
 

@@ -1,9 +1,11 @@
-import { motion } from "framer-motion";
-import { ChevronRight, Moon, Heart } from "lucide-react";
-import type { Player, Card } from "../types/game";
+import { motion, AnimatePresence } from "framer-motion";
+import { ChevronRight, Moon, Heart, Sparkles, Star } from "lucide-react";
+import type { Player, Card, AIDifficulty } from "../types/game";
 import { Card as CardComponent } from "./Card";
 import { cn } from "../lib/utils";
 import { getScoreColor, getProgressBarColor, buttonClasses } from "../lib/styles";
+import { useEffect } from "react";
+import { playSound } from "../lib/sounds";
 
 interface RoundSummaryOverlayProps {
   players: Player[];
@@ -29,6 +31,40 @@ export function RoundSummaryOverlay({
   // Find who scored the most this round (not great in Hearts!)
   const maxRoundScore = Math.max(...roundScores);
   const minRoundScore = Math.min(...roundScores);
+
+  // Play moon sound effect when someone shoots the moon
+  useEffect(() => {
+    if (shotTheMoon) {
+      // Small delay for dramatic effect
+      const timer = setTimeout(() => {
+        playSound("shootTheMoon");
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [shotTheMoon]);
+
+  // Helper function to get difficulty badge info
+  const getDifficultyBadge = (difficulty: AIDifficulty | undefined) => {
+    if (!difficulty) return null;
+    const badges = {
+      easy: {
+        icon: "🌱",
+        label: "Easy",
+        color: "bg-green-500/20 border-green-500/40 text-green-200",
+      },
+      medium: {
+        icon: "⚡",
+        label: "Medium",
+        color: "bg-yellow-500/20 border-yellow-500/40 text-yellow-200",
+      },
+      hard: {
+        icon: "🧠",
+        label: "Hard",
+        color: "bg-purple-500/20 border-purple-500/40 text-purple-200",
+      },
+    };
+    return badges[difficulty];
+  };
 
   return (
     <motion.div
@@ -64,18 +100,7 @@ export function RoundSummaryOverlay({
             </div>
 
             {shotTheMoon && (
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.3, type: "spring" }}
-                className="flex items-center justify-center gap-2 text-purple-300 mt-2"
-              >
-                <Moon className="w-5 h-5" />
-                <span className="font-bold">
-                  {players[shotTheMoon.playerIndex].name} shot the moon!
-                </span>
-                <Moon className="w-5 h-5" />
-              </motion.div>
+              <MoonCelebration playerName={players[shotTheMoon.playerIndex].name} />
             )}
           </motion.div>
 
@@ -125,7 +150,22 @@ export function RoundSummaryOverlay({
                       {player.name}
                     </span>
                     {player.isAI && (
-                      <span className="text-white/50 text-xs">🤖</span>
+                      <>
+                        <span className="text-white/50 text-xs">🤖</span>
+                        {getDifficultyBadge(player.difficulty) && (
+                          <div
+                            className={cn(
+                              "flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium backdrop-blur-sm border",
+                              getDifficultyBadge(player.difficulty)?.color
+                            )}
+                            title={getDifficultyBadge(player.difficulty)?.label}
+                          >
+                            <span>
+                              {getDifficultyBadge(player.difficulty)?.icon}
+                            </span>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                   <div className="text-center">
@@ -172,8 +212,25 @@ export function RoundSummaryOverlay({
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-xs font-medium text-white/70">
                           {player.name}
-                          {player.isAI && " 🤖"}
                         </span>
+                        {player.isAI && (
+                          <>
+                            <span className="text-white/50 text-xs">🤖</span>
+                            {getDifficultyBadge(player.difficulty) && (
+                              <div
+                                className={cn(
+                                  "flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium backdrop-blur-sm border",
+                                  getDifficultyBadge(player.difficulty)?.color
+                                )}
+                                title={getDifficultyBadge(player.difficulty)?.label}
+                              >
+                                <span>
+                                  {getDifficultyBadge(player.difficulty)?.icon}
+                                </span>
+                              </div>
+                            )}
+                          </>
+                        )}
                       </div>
                       <div className="flex flex-wrap gap-1.5">
                         {playerCards.map((card: Card, cardIdx: number) => (
@@ -258,6 +315,156 @@ export function RoundSummaryOverlay({
             )}
           </motion.button>
         </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+/**
+ * Spectacular moon shooting celebration animation
+ */
+function MoonCelebration({ playerName }: { playerName: string }) {
+  // Generate random particles for the celebration
+  const particles = Array.from({ length: 20 }, (_, i) => ({
+    id: i,
+    angle: (i / 20) * 360,
+    delay: i * 0.05,
+    distance: 80 + Math.random() * 40,
+  }));
+
+  const stars = Array.from({ length: 12 }, (_, i) => ({
+    id: i,
+    x: (Math.random() - 0.5) * 300,
+    y: (Math.random() - 0.5) * 150,
+    delay: 0.5 + Math.random() * 0.5,
+    scale: 0.5 + Math.random() * 0.5,
+  }));
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="relative mt-4 mb-2"
+    >
+      {/* Glowing background pulse */}
+      <motion.div
+        className="absolute inset-0 -inset-x-20 -inset-y-10"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: [0, 0.3, 0.1, 0.3, 0.1] }}
+        transition={{ duration: 2, repeat: Infinity }}
+      >
+        <div className="absolute inset-0 bg-gradient-radial from-purple-500/30 via-purple-500/10 to-transparent rounded-full blur-xl" />
+      </motion.div>
+
+      {/* Floating stars */}
+      {stars.map((star) => (
+        <motion.div
+          key={star.id}
+          className="absolute left-1/2 top-1/2 text-yellow-300"
+          initial={{ opacity: 0, scale: 0, x: 0, y: 0 }}
+          animate={{
+            opacity: [0, 1, 0],
+            scale: [0, star.scale, 0],
+            x: star.x,
+            y: star.y,
+          }}
+          transition={{
+            duration: 1.5,
+            delay: star.delay,
+            repeat: Infinity,
+            repeatDelay: 1,
+          }}
+        >
+          <Star className="w-4 h-4 fill-current" />
+        </motion.div>
+      ))}
+
+      {/* Particle burst */}
+      {particles.map((particle) => (
+        <motion.div
+          key={particle.id}
+          className="absolute left-1/2 top-1/2 w-2 h-2"
+          initial={{ opacity: 0, x: 0, y: 0, scale: 0 }}
+          animate={{
+            opacity: [0, 1, 0],
+            x: Math.cos((particle.angle * Math.PI) / 180) * particle.distance,
+            y: Math.sin((particle.angle * Math.PI) / 180) * particle.distance,
+            scale: [0, 1, 0],
+          }}
+          transition={{
+            duration: 1,
+            delay: 0.3 + particle.delay,
+            ease: "easeOut",
+          }}
+        >
+          <div className="w-full h-full rounded-full bg-gradient-to-br from-purple-400 to-pink-500" />
+        </motion.div>
+      ))}
+
+      {/* Main celebration content */}
+      <motion.div
+        className="relative flex flex-col items-center"
+        initial={{ scale: 0, rotate: -180 }}
+        animate={{ scale: 1, rotate: 0 }}
+        transition={{
+          type: "spring",
+          stiffness: 200,
+          damping: 15,
+          delay: 0.2,
+        }}
+      >
+        {/* Moon icon with glow */}
+        <motion.div
+          className="relative"
+          animate={{
+            scale: [1, 1.1, 1],
+            rotate: [0, 5, -5, 0],
+          }}
+          transition={{
+            duration: 2,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+        >
+          <div className="absolute inset-0 blur-lg bg-purple-400/50 rounded-full scale-150" />
+          <Moon className="relative w-12 h-12 text-purple-300 fill-purple-400/30" />
+        </motion.div>
+
+        {/* Text announcement */}
+        <motion.div
+          className="mt-3 text-center"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+        >
+          <motion.div
+            className="flex items-center justify-center gap-2 mb-1"
+            animate={{ scale: [1, 1.05, 1] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+          >
+            <Sparkles className="w-5 h-5 text-yellow-400" />
+            <span className="text-lg font-bold bg-gradient-to-r from-purple-300 via-pink-300 to-purple-300 bg-clip-text text-transparent">
+              SHOT THE MOON!
+            </span>
+            <Sparkles className="w-5 h-5 text-yellow-400" />
+          </motion.div>
+          <motion.p
+            className="text-purple-200 font-medium"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.7 }}
+          >
+            {playerName} collected all 26 points!
+          </motion.p>
+          <motion.p
+            className="text-purple-300/70 text-sm mt-1"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.9 }}
+          >
+            Everyone else gets +26 points
+          </motion.p>
+        </motion.div>
       </motion.div>
     </motion.div>
   );

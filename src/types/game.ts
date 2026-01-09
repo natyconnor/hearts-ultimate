@@ -3,9 +3,18 @@
 export type CardSuit = "hearts" | "diamonds" | "clubs" | "spades";
 export type CardRank = 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14; // 11=J, 12=Q, 13=K, 14=A
 
-export interface Card {
+/**
+ * Minimal card identity - just suit and rank.
+ * Use this when you only need to identify/compare cards, not calculate points.
+ */
+export interface CardIdentity {
   suit: CardSuit;
   rank: CardRank;
+}
+
+export interface Card extends CardIdentity {
+  /** Penalty points this card is worth in Hearts (0, 1 for hearts, 13 for Q♠) */
+  points: number;
 }
 
 // AI difficulty levels
@@ -42,6 +51,7 @@ export interface GameState {
   dealerIndex?: number;
   trickLeaderIndex?: number; // Index of player who led the current trick
   roundNumber: number; // Current round number (1-based)
+  currentTrickNumber: number; // Current trick number within the round (1-based, resets to 1 each round)
   isRoundComplete?: boolean; // Flag to indicate round just completed (for UI)
   isGameOver?: boolean; // Flag to indicate game has ended (someone reached 100+ points)
   winnerIndex?: number; // Index of the winning player (lowest score when game ends)
@@ -58,6 +68,9 @@ export interface GameState {
   // Only contains penalty cards: hearts (1pt each) and Queen of Spades (13pts)
   // All penalty cards from a trick go to the trick winner
   pointsCardsTaken?: Card[][]; // Penalty cards taken by each player (indexed by player index)
+
+  // Moon shooting tracking (set BEFORE scores are adjusted)
+  shotTheMoon?: { playerIndex: number } | null;
 }
 
 export interface GameRoom {

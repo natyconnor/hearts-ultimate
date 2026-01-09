@@ -178,12 +178,8 @@ export function calculateTrickPoints(
 
   trick.forEach(({ playerId, card }) => {
     points[playerId] = points[playerId] || 0;
-
-    if (isHeart(card)) {
-      points[playerId] += 1;
-    } else if (isQueenOfSpades(card)) {
-      points[playerId] += 13;
-    }
+    // Use the card's built-in point value
+    points[playerId] += card.points;
   });
 
   return points;
@@ -265,6 +261,6 @@ export function findPlayerWithTwoOfClubs(gameState: GameState): number {
  * Checks if it's the first trick of the round
  */
 export function isFirstTrick(gameState: GameState): boolean {
-  // First trick if all players have 13 cards (no cards played yet)
-  return gameState.players.every((player) => player.hand.length === 13);
+  // First trick if currentTrickNumber is 1 (or undefined for backwards compatibility)
+  return (gameState.currentTrickNumber ?? 1) === 1;
 }

@@ -63,8 +63,17 @@ export function hasProtectedHighCards(hand: Card[], suit: CardSuit): boolean {
 }
 
 /**
+ * Minimum rank for cards to be considered for voiding
+ * Cards below this rank (2-5) are too valuable for ducking to pass away
+ */
+const MIN_VOID_CANDIDATE_RANK = 6;
+
+/**
  * Get cards that would be good to pass to void a suit
  * Prioritizes suits with fewer cards
+ *
+ * IMPORTANT: Only returns cards with rank >= 6
+ * Low cards (2-5) are too valuable for ducking to ever pass just for voiding
  */
 export function getVoidingPassCandidates(hand: Card[]): Card[] {
   const distribution = getSuitDistribution(hand);
@@ -80,7 +89,12 @@ export function getVoidingPassCandidates(hand: Card[]): Card[] {
 
   for (const suit of shortSuits) {
     const cardsOfSuit = getCardsOfSuit(hand, suit);
-    candidates.push(...cardsOfSuit);
+    // Only include cards rank 6+ as void candidates
+    // Low cards (2-5) are too valuable for ducking
+    const passableCards = cardsOfSuit.filter(
+      (c) => c.rank >= MIN_VOID_CANDIDATE_RANK
+    );
+    candidates.push(...passableCards);
   }
 
   return candidates;

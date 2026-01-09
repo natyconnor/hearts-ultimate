@@ -8,6 +8,43 @@ import type { Card, CardSuit, GameState, AIDifficulty } from "../../types/game";
 export type { AIDifficulty } from "../../types/game";
 
 /**
+ * AI Version Number
+ *
+ * Increment this number whenever AI behavior changes.
+ * This helps track which version of the AI generated logs for debugging and analysis.
+ *
+ * Version history:
+ * - 1: Initial implementation
+ * - 2: Fixed Hard AI bugs:
+ *      - Fixed isFirstTrick() to check max hand size, not all hands equal 13
+ *        (was broken for players 2-4 on trick 1 after player 1 played)
+ *      - Fixed memory logic: "opponent has high cards" is now a bonus when
+ *        leading low cards (they take the trick), not a penalty
+ *      - Smarter heart leading: low hearts (2-5) are good leads, high hearts risky
+ *      - Cleaner first-trick handling in follow logic
+ * - 3: Fixed critical bug where Hard AI memory was never being updated!
+ *      - Added notifyTrickComplete() calls when tricks complete
+ *      - Added resetAIForNewRound() calls at round start
+ *      - Now currentTrickNumber is explicitly tracked in GameState
+ * - 4: Fixed bug where AI didn't check if Q♠ is in the CURRENT trick
+ *      - When following spades and Q♠ is already played in trick, high spades are safe
+ *      - Added isQueenOfSpadesAccountedFor() helper that checks both current trick and memory
+ * - 5: Fixed overly aggressive voiding during passing phase
+ *      - Low cards (rank < 6) now have strong penalty against being passed (-35)
+ *      - Void opportunity bonus only applies to cards rank 6+
+ *      - getVoidingPassCandidates() now filters out low cards
+ *      - Low cards (2-5) are extremely valuable for ducking and should almost never be passed
+ * - 6: Added PROACTIVE moon shooting for Hard AI
+ *      - evaluateMoonPotential() evaluates hand strength for shooting
+ *      - Criteria: A♥ (critical), Q♠ control, high cards across suits, suit length
+ *      - When shooting: pass LOW cards, keep HIGH cards (opposite of normal!)
+ *      - Play scoring inverted: try to WIN tricks and collect penalty points
+ *      - Moon abort detection: stops if opponent takes penalty points
+ *      - Shown in debug logs with "MOON" context and confidence %
+ */
+export const AI_VERSION = 6;
+
+/**
  * Context for making AI decisions during play
  */
 export interface PlayContext {
@@ -103,7 +140,8 @@ export interface AIStrategy {
   onTrickComplete?(
     trick: Array<{ playerId: string; card: Card }>,
     winnerIndex: number,
-    trickNumber: number
+    trickNumber: number,
+    gameState?: GameState
   ): void;
 
   /**
@@ -190,6 +228,10 @@ export const THRESHOLDS = {
   MOON_HEARTS_WITHOUT_QUEEN: 10,
   /** Score lead to be considered "winning by a lot" */
   WINNING_LEAD_MARGIN: 20,
+  /** Moon shooting: tricks <= this are "early game" (sneaky phase) */
+  MOON_EARLY_GAME_TRICKS: 5,
+  /** Moon shooting: tricks <= this are "mid game" (collection phase) */
+  MOON_MID_GAME_TRICKS: 9,
 } as const;
 
 /**
@@ -216,6 +258,10 @@ export const PASS_SCORES = {
   SPADE_DEFENSE_MULTIPLIER: 15,
   /** Score for high spades without Q♠ */
   HIGH_SPADE_NO_QUEEN: 15,
+  /** Score penalty for passing low cards (rank < 6) - these are valuable for ducking */
+  LOW_CARD_PROTECTION: -35,
+  /** Threshold rank below which cards are considered "low" and valuable to keep */
+  LOW_CARD_THRESHOLD: 6,
 } as const;
 
 /**
@@ -260,6 +306,30 @@ export const LEAD_SCORES = {
   OPPONENT_VOID_IN_SUIT: -15,
   /** Penalty for leading into moon shooter void */
   MOON_SHOOTER_VOID: -20,
+  /** Penalty for hearts not broken (can't lead) */
+  HEARTS_NOT_BROKEN: -100,
+  /** Bonus for low heart when opponents are void */
+  LOW_HEART_VOID_OPPONENTS: 10,
+  /** Penalty for higher hearts with void opponents */
+  HIGH_HEART_VOID_RISK: -20,
+  /** Bonus for low heart lead (no void opponents) */
+  LOW_HEART_LEAD: 15,
+  /** Penalty for high hearts (might win) */
+  HIGH_HEART_RISK: -15,
+  /** Penalty for mid-range hearts */
+  MID_HEART: -5,
+  /** Penalty for never leading Q♠ */
+  NEVER_LEAD_QUEEN: -200,
+  /** Penalty for saving spade to protect Q♠ */
+  SAVE_SPADE_FOR_QUEEN: -20,
+  /** Penalty for high spade might catch Q♠ */
+  HIGH_SPADE_CATCH_QUEEN: -25,
+  /** Multiplier for opponents void in suit */
+  OPPONENT_VOID_MULTIPLIER: -15,
+  /** Multiplier for opponents with high cards (bonus) */
+  OPPONENT_HIGH_CARDS_MULTIPLIER: 10,
+  /** Bonus for safe low lead (clubs/diamonds) */
+  SAFE_LOW_LEAD: 15,
 } as const;
 
 /**
@@ -274,8 +344,8 @@ export const FOLLOW_SCORES = {
   TRICK_1_RANK_MULTIPLIER: 2,
   /** Base penalty for winning with points */
   WIN_WITH_POINTS_BASE: -40,
-  /** Multiplier for penalty points */
-  PENALTY_POINTS_MULTIPLIER: 5,
+  /** Multiplier for penalty points (negative = more points is worse) */
+  PENALTY_POINTS_MULTIPLIER: -5,
   /** Score for safe win as last player */
   SAFE_WIN_LAST_PLAYER: 10,
   /** Score penalty for risk of penalty dump */
@@ -284,8 +354,8 @@ export const FOLLOW_SCORES = {
   DUCK: 25,
   /** Score for moon shot - take penalties */
   MOON_SHOT_TAKE: 50,
-  /** Score for stopping moon */
-  STOP_MOON: 30,
+  /** Score for stopping moon - MUST be higher than DUCK to override ducking! */
+  STOP_MOON: 150,
   /** Score for safe win */
   SAFE_WIN: 20,
   /** Score for bluff - take safe trick */
@@ -310,12 +380,12 @@ export const DUMP_SCORES = {
   KEEP_LOW_SPADE: -25,
   /** Score for dumping on leader */
   DUMP_ON_LEADER: 30,
-  /** Penalty for giving Q♠ to moon shooter */
-  DONT_GIVE_QUEEN_TO_SHOOTER: -100,
-  /** Penalty for giving hearts to moon shooter */
-  DONT_GIVE_HEARTS_TO_SHOOTER: -50,
-  /** Score for dumping on non-shooter */
-  DUMP_ON_NON_SHOOTER: 200,
+  /** Penalty for giving Q♠ to moon shooter - MUST override QUEEN_OF_SPADES bonus! */
+  DONT_GIVE_QUEEN_TO_SHOOTER: -350,
+  /** Penalty for giving hearts to moon shooter - MUST override HEART dump bonus! */
+  DONT_GIVE_HEARTS_TO_SHOOTER: -200,
+  /** Score for dumping on non-shooter (actively try to stop moon) */
+  DUMP_ON_NON_SHOOTER: 250,
   /** Hard AI keep spade when Q♠ still out */
   HARD_KEEP_SPADE_QUEEN_OUT: -30,
   /** Hard AI keep low spade */

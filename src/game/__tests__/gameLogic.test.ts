@@ -6,9 +6,11 @@ import {
   prepareNewRound,
   resetGameForNewGame,
 } from "../gameLogic";
+import { createCard } from "../deck";
 import type { Card, GameState } from "../../types/game";
 
-const card = (suit: Card["suit"], rank: Card["rank"]): Card => ({ suit, rank });
+const card = (suit: Card["suit"], rank: Card["rank"]): Card =>
+  createCard(suit, rank);
 
 const createTestGameState = (overrides?: Partial<GameState>): GameState => ({
   players: [
@@ -23,6 +25,7 @@ const createTestGameState = (overrides?: Partial<GameState>): GameState => ({
   roundScores: [0, 0, 0, 0],
   heartsBroken: false,
   roundNumber: 1,
+  currentTrickNumber: 1,
   currentPlayerIndex: 0,
   ...overrides,
 });
@@ -62,7 +65,10 @@ describe("gameLogic - playCard", () => {
   });
 
   it("breaks hearts when a heart is played", () => {
-    const state = createTestGameState({ currentPlayerIndex: 1 });
+    const state = createTestGameState({
+      currentPlayerIndex: 1,
+      currentTrickNumber: 2, // Not first trick - hearts can be played
+    });
     state.players[0].hand = [card("clubs", 2)];
     state.players[1].hand = [card("hearts", 7)];
     state.currentTrick = [{ playerId: "p1", card: card("clubs", 2) }];
@@ -106,6 +112,7 @@ describe("gameLogic - playCard", () => {
     const state = createTestGameState({
       currentPlayerIndex: 3,
       roundScores: [0, 0, 0, 0],
+      currentTrickNumber: 2, // Not first trick - penalty cards allowed
     });
     state.currentTrick = [
       { playerId: "p1", card: card("hearts", 5) }, // 1 point
