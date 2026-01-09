@@ -1,12 +1,15 @@
 import { defineConfig } from "vitest/config";
 import path from "path";
 import { fileURLToPath } from "url";
+import react from "@vitejs/plugin-react";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
+  plugins: [react()],
   test: {
-    environment: "node",
+    // Use happy-dom for component tests (faster than jsdom)
+    environment: "happy-dom",
     globals: true,
     pool: "forks",
     poolOptions: {
@@ -14,6 +17,8 @@ export default defineConfig({
         singleFork: true,
       },
     },
+    // Setup file for testing-library matchers
+    setupFiles: ["./src/test/setup.ts"],
     // Explicitly exclude .pnpm-store and other directories
     exclude: [
       "**/node_modules/**",
@@ -23,6 +28,8 @@ export default defineConfig({
     ],
     // Explicitly set the root to avoid path resolution issues
     root: process.cwd(),
+    // CSS handling for component tests
+    css: true,
   },
   resolve: {
     alias: {
