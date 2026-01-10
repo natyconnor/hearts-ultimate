@@ -14,7 +14,11 @@ import {
   useSpectatorMutations,
 } from "../hooks/useGameMutations";
 import { useGameStore } from "../store/gameStore";
-import { STORAGE_KEYS } from "../lib/constants";
+import {
+  STORAGE_KEYS,
+  AI_SPEED_RANGE,
+  getAIDelayFromSpeed,
+} from "../lib/constants";
 import { chooseAICard } from "../lib/ai";
 import { hasPlayerSubmittedPass } from "../game/passingLogic";
 import { cardsEqual } from "../game/cardDisplay";
@@ -359,7 +363,13 @@ export function GameRoom() {
     if (!currentPlayer.isAI) return;
 
     // In test mode, skip delays for fast playthrough
-    const delay = isTestMode ? 50 : 800;
+    // Otherwise, use the user's configured AI play speed
+    const storedSpeed = localStorage.getItem(STORAGE_KEYS.AI_PLAY_SPEED);
+    const aiSpeed =
+      storedSpeed !== null
+        ? parseFloat(storedSpeed)
+        : AI_SPEED_RANGE.DEFAULT_SPEED;
+    const delay = isTestMode ? 50 : getAIDelayFromSpeed(aiSpeed);
 
     const timeoutId = setTimeout(() => {
       // Double-check conditions haven't changed

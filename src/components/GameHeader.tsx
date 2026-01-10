@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Home } from "lucide-react";
-import { SoundSettings } from "./SoundSettings";
+import { GameSettings } from "./GameSettings";
 
 interface GameHeaderProps {
   slug: string;
@@ -22,7 +22,7 @@ export function GameHeader({
       <div className="w-full px-4 md:px-6 lg:px-8 py-3 md:py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-6">
-            <SoundSettings />
+            <GameSettings />
             <Link
               to="/"
               className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium text-sm transition-all border border-white/20 hover:border-white/30 cursor-pointer"

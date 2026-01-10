@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Settings, X, Volume2, VolumeX } from "lucide-react";
+import { Settings, X, Volume2, VolumeX, Zap } from "lucide-react";
 import { cn } from "../lib/utils";
 import { soundManager } from "../lib/sounds";
 import { playSound } from "../lib/sounds";
-import { STORAGE_KEYS } from "../lib/constants";
+import { STORAGE_KEYS, AI_SPEED_RANGE } from "../lib/constants";
 
-export function SoundSettings() {
+export function GameSettings() {
   const [isOpen, setIsOpen] = useState(false);
   // Initialize from soundManager to ensure consistency
   const [soundEnabled, setSoundEnabled] = useState(() => {
@@ -14,6 +14,10 @@ export function SoundSettings() {
   });
   const [volume, setVolume] = useState(() => {
     return soundManager.getVolume();
+  });
+  const [aiSpeed, setAISpeed] = useState(() => {
+    const stored = localStorage.getItem(STORAGE_KEYS.AI_PLAY_SPEED);
+    return stored !== null ? parseFloat(stored) : AI_SPEED_RANGE.DEFAULT_SPEED;
   });
 
   // Sync sound manager when settings change
@@ -27,6 +31,10 @@ export function SoundSettings() {
     localStorage.setItem(STORAGE_KEYS.SOUND_VOLUME, String(volume));
   }, [volume]);
 
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.AI_PLAY_SPEED, String(aiSpeed));
+  }, [aiSpeed]);
+
   const handleVolumeChange = (newVolume: number) => {
     setVolume(newVolume);
   };
@@ -38,6 +46,24 @@ export function SoundSettings() {
       playSound("buttonClick");
     }
   };
+
+  const handleAISpeedChange = (newSpeed: number) => {
+    setAISpeed(newSpeed);
+  };
+
+  // Get display text and emoji for AI speed
+  // Note: speed 0 = slow, speed 1 = fast (slider goes left to right)
+  const getSpeedInfo = (
+    speed: number
+  ): { label: string; emoji: string } => {
+    if (speed >= 0.8) return { label: "Very Fast", emoji: "⚡" };
+    if (speed >= 0.6) return { label: "Fast", emoji: "🏃" };
+    if (speed >= 0.4) return { label: "Normal", emoji: "🚶" };
+    if (speed >= 0.2) return { label: "Slow", emoji: "🐢" };
+    return { label: "Very Slow", emoji: "🦥" };
+  };
+
+  const speedInfo = getSpeedInfo(aiSpeed);
 
   return (
     <>
@@ -57,7 +83,7 @@ export function SoundSettings() {
           "border border-white/20 hover:border-white/30",
           "focus:outline-none focus:ring-2 focus:ring-white/50"
         )}
-        aria-label="Sound settings"
+        aria-label="Game settings"
       >
         <Settings className="w-5 h-5" />
       </button>
@@ -85,7 +111,7 @@ export function SoundSettings() {
             >
               {/* Header */}
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-white">Sound Settings</h2>
+                <h2 className="text-xl font-bold text-white">Game Settings</h2>
                 <button
                   onClick={() => setIsOpen(false)}
                   className={cn(
@@ -98,6 +124,50 @@ export function SoundSettings() {
                   <X className="w-5 h-5" />
                 </button>
               </div>
+
+              {/* AI Speed Slider */}
+              <div className="mb-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <Zap className="w-4 h-4 text-amber-400" />
+                  <label
+                    htmlFor="ai-speed-slider"
+                    className="text-sm font-medium text-white/90"
+                  >
+                    AI Play Speed
+                  </label>
+                  <span className="ml-auto text-sm text-white/70 flex items-center gap-1.5">
+                    <span>{speedInfo.emoji}</span>
+                    <span>{speedInfo.label}</span>
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-white/50">Slow</span>
+                  <input
+                    type="range"
+                    id="ai-speed-slider"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={aiSpeed}
+                    onChange={(e) =>
+                      handleAISpeedChange(parseFloat(e.target.value))
+                    }
+                    className={cn(
+                      "flex-1 h-2 rounded-full appearance-none cursor-pointer",
+                      "bg-gray-700 accent-amber-500",
+                      "[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:cursor-pointer",
+                      "[&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer"
+                    )}
+                  />
+                  <span className="text-xs text-white/50">Fast</span>
+                </div>
+                <p className="text-xs text-white/60 mt-2">
+                  Adjust how quickly AI players make their moves
+                </p>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-white/10 mb-6" />
 
               {/* Sound Toggle */}
               <div className="mb-6">
@@ -112,9 +182,7 @@ export function SoundSettings() {
                     onClick={handleToggleSound}
                     className={cn(
                       "relative w-12 h-6 rounded-full transition-colors",
-                      soundEnabled
-                        ? "bg-emerald-500"
-                        : "bg-gray-600"
+                      soundEnabled ? "bg-emerald-500" : "bg-gray-600"
                     )}
                     id="sound-toggle"
                     aria-label={soundEnabled ? "Disable sound" : "Enable sound"}

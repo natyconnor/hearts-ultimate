@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, Copy, Check, Eye, Home } from "lucide-react";
-import { SoundSettings } from "./SoundSettings";
+import { GameSettings } from "./GameSettings";
 import { cn } from "../lib/utils";
 import { getDifficultyDisplayName } from "../lib/aiPlayers";
 import type { Player, AIDifficulty, Spectator } from "../types/game";
@@ -198,7 +198,7 @@ export function GameLobby({
     <div className="min-h-screen bg-gradient-to-br from-poker-green via-green-800 to-poker-green flex items-center justify-center p-4 relative">
       {/* Top Left Controls - Sound Settings & Home */}
       <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
-        <SoundSettings />
+        <GameSettings />
         <button
           onClick={() => navigate("/")}
           className={cn(

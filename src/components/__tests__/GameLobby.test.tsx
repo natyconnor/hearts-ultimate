@@ -16,9 +16,9 @@ vi.mock("react-router-dom", () => ({
   useNavigate: () => vi.fn(),
 }));
 
-// Mock SoundSettings component
-vi.mock("../SoundSettings", () => ({
-  SoundSettings: () => <div>SoundSettings</div>,
+// Mock GameSettings component
+vi.mock("../GameSettings", () => ({
+  GameSettings: () => <div>GameSettings</div>,
 }));
 
 describe("GameLobby Component", () => {
