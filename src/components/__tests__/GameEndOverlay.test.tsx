@@ -1,7 +1,11 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "../../test/testUtils";
 import { GameEndOverlay } from "../GameEndOverlay";
-import { createTestPlayers, createAIPlayer, createPlayer } from "../../test/testUtils";
+import {
+  createTestPlayers,
+  createAIPlayer,
+  createPlayer,
+} from "../../test/testUtils";
 
 describe("GameEndOverlay Component", () => {
   const defaultProps = {
@@ -97,11 +101,7 @@ describe("GameEndOverlay Component", () => {
       ];
 
       render(
-        <GameEndOverlay
-          {...defaultProps}
-          players={players}
-          winnerIndex={0}
-        />
+        <GameEndOverlay {...defaultProps} players={players} winnerIndex={0} />
       );
 
       expect(screen.queryByText("🤖")).not.toBeInTheDocument();
@@ -196,11 +196,7 @@ describe("GameEndOverlay Component", () => {
       ];
 
       render(
-        <GameEndOverlay
-          {...defaultProps}
-          players={aiPlayers}
-          winnerIndex={0}
-        />
+        <GameEndOverlay {...defaultProps} players={aiPlayers} winnerIndex={0} />
       );
 
       const robotEmojis = screen.getAllByText("🤖");
