@@ -15,6 +15,7 @@ import {
   startRoundWithPassingPhase,
   completeRevealPhase,
   finalizePassingPhase,
+  playCard as playCardFn,
 } from "../game/gameLogic";
 import {
   submitPassSelection,
@@ -375,7 +376,6 @@ export function useGameplayMutations({
         throw new Error("No player ID provided");
       }
 
-      const { playCard: playCardFn } = await import("../game/gameLogic");
       const result = playCardFn(currentGameState, targetPlayerId, card);
 
       if (result.error) {
