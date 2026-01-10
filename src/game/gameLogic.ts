@@ -1,4 +1,4 @@
-import type { Card, GameState } from "../types/game";
+import type { Card, GameState, RoundScoreRecord } from "../types/game";
 import {
   canPlayCard,
   getTrickWinner,
@@ -147,6 +147,19 @@ export function playCard(
         );
       }
 
+      // Record this round in history
+      const roundRecord: RoundScoreRecord = {
+        roundNumber: gameState.roundNumber,
+        scores: finalRoundScores,
+        shotTheMoon: moonCheck.shot
+          ? { playerIndex: moonCheck.playerIndex! }
+          : null,
+      };
+      const updatedRoundHistory = [
+        ...(gameState.roundHistory ?? []),
+        roundRecord,
+      ];
+
       finalGameState = {
         ...finalGameState,
         currentTrick: [],
@@ -160,6 +173,7 @@ export function playCard(
         isGameOver: gameOver,
         winnerIndex: gameWinnerIndex,
         pointsCardsTaken: updatedPointsCardsTaken,
+        roundHistory: updatedRoundHistory,
         // Store moon shot info BEFORE scores are adjusted
         shotTheMoon: moonCheck.shot
           ? { playerIndex: moonCheck.playerIndex! }
@@ -253,6 +267,7 @@ export function startRoundWithPassingPhase(
     isPassingPhase: passDirection !== "none",
     passSubmissions: passDirection !== "none" ? [] : undefined,
     pointsCardsTaken: [[], [], [], []], // Initialize points cards taken for new round
+    roundHistory: [], // Initialize round history for new game
   };
 
   // If no passing this round, initialize for play immediately
@@ -327,6 +342,7 @@ export function prepareNewRound(
     passDirection,
     isPassingPhase: passDirection !== "none",
     pointsCardsTaken: [[], [], [], []], // Initialize points cards taken for new round
+    // Note: roundHistory is NOT reset here - it persists across rounds
     passSubmissions: passDirection !== "none" ? [] : undefined,
   };
 
@@ -379,6 +395,7 @@ export function resetGameForNewGame(
     isPassingPhase: passDirection !== "none",
     passSubmissions: passDirection !== "none" ? [] : undefined,
     pointsCardsTaken: [[], [], [], []], // Initialize points cards taken for new game
+    roundHistory: [], // Reset round history for new game
   };
 
   // Stay in passing phase

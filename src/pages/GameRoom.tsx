@@ -501,6 +501,7 @@ export function GameRoom() {
               totalScores={currentGameState.scores}
               shotTheMoon={currentGameState.shotTheMoon}
               pointsCardsTaken={currentGameState.pointsCardsTaken}
+              roundHistory={currentGameState.roundHistory}
               onNextRound={() => gameplayMutations.nextRound.mutate()}
               isLoading={gameplayMutations.nextRound.isPending}
             />

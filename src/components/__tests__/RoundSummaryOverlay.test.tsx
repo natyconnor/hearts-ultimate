@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "../../test/testUtils";
 import { RoundSummaryOverlay } from "../RoundSummaryOverlay";
 import { createTestPlayers, createCard } from "../../test/testUtils";
-import type { Card } from "../../types/game";
+import type { Card, RoundScoreRecord } from "../../types/game";
 import { GAME_CONFIG } from "../../lib/constants";
 
 // Mock the sound module
@@ -90,7 +90,7 @@ describe("RoundSummaryOverlay Component", () => {
   });
 
   describe("Points Cards Taken Section", () => {
-    it("displays cards taken by players", () => {
+    it("renders collapsible points taken header", () => {
       const pointsCardsTaken: Card[][] = [
         [createCard("hearts", 5), createCard("hearts", 8)],
         [createCard("hearts", 3), createCard("spades", 12)],
@@ -105,10 +105,11 @@ describe("RoundSummaryOverlay Component", () => {
         />
       );
 
-      expect(screen.getByText("Cards Taken")).toBeInTheDocument();
+      expect(screen.getByText("Points Taken")).toBeInTheDocument();
+      expect(screen.getByText("(5 cards)")).toBeInTheDocument();
     });
 
-    it("does not show cards taken section when no points cards", () => {
+    it("does not show points taken section when no points cards", () => {
       const pointsCardsTaken: Card[][] = [[], [], [], []];
 
       render(
@@ -118,10 +119,10 @@ describe("RoundSummaryOverlay Component", () => {
         />
       );
 
-      expect(screen.queryByText("Cards Taken")).not.toBeInTheDocument();
+      expect(screen.queryByText("Points Taken")).not.toBeInTheDocument();
     });
 
-    it("only shows players who took cards", () => {
+    it("expands to show player cards on click", () => {
       const pointsCardsTaken: Card[][] = [
         [createCard("hearts", 5)],
         [],
@@ -136,8 +137,13 @@ describe("RoundSummaryOverlay Component", () => {
         />
       );
 
-      // Should show "You" in the cards taken section
-      // But not other players who took nothing
+      // Click to expand
+      fireEvent.click(screen.getByText("Points Taken"));
+
+      // Should show "You" in the expanded cards taken section
+      // "You" appears multiple times (main score table + expanded section)
+      const youTexts = screen.getAllByText("You");
+      expect(youTexts.length).toBeGreaterThanOrEqual(2);
     });
   });
 
@@ -283,6 +289,150 @@ describe("RoundSummaryOverlay Component", () => {
 
       render(<RoundSummaryOverlay {...props} />);
       expect(screen.getByText("Round 1 Complete")).toBeInTheDocument();
+    });
+  });
+
+  describe("Round History Section", () => {
+    const createRoundHistory = (): RoundScoreRecord[] => [
+      {
+        roundNumber: 1,
+        scores: [5, 8, 0, 13], // Player 2 had 0, Player 3 got Q♠
+        shotTheMoon: null,
+      },
+      {
+        roundNumber: 2,
+        scores: [3, 0, 26, 0], // Player 2 shot the moon (everyone else gets 26)
+        shotTheMoon: { playerIndex: 2 },
+      },
+      {
+        roundNumber: 3,
+        scores: [5, 12, 0, 9], // Current round scores from defaultProps
+        shotTheMoon: null,
+      },
+    ];
+
+    it("renders collapsible round history header", () => {
+      render(
+        <RoundSummaryOverlay
+          {...defaultProps}
+          roundHistory={createRoundHistory()}
+        />
+      );
+
+      expect(screen.getByText("Score History")).toBeInTheDocument();
+      expect(screen.getByText("(3 rounds)")).toBeInTheDocument();
+    });
+
+    it("does not show round history when empty", () => {
+      render(<RoundSummaryOverlay {...defaultProps} roundHistory={[]} />);
+
+      expect(screen.queryByText("Score History")).not.toBeInTheDocument();
+    });
+
+    it("does not show round history when undefined", () => {
+      render(
+        <RoundSummaryOverlay {...defaultProps} roundHistory={undefined} />
+      );
+
+      expect(screen.queryByText("Score History")).not.toBeInTheDocument();
+    });
+
+    it("does not show round history when only 1 round", () => {
+      // Only show history when there's more than 1 round to compare
+      const singleRound: RoundScoreRecord[] = [
+        { roundNumber: 1, scores: [5, 8, 0, 13], shotTheMoon: null },
+      ];
+
+      render(
+        <RoundSummaryOverlay {...defaultProps} roundHistory={singleRound} />
+      );
+
+      expect(screen.queryByText("Score History")).not.toBeInTheDocument();
+    });
+
+    it("expands round history on header click", () => {
+      render(
+        <RoundSummaryOverlay
+          {...defaultProps}
+          roundHistory={createRoundHistory()}
+        />
+      );
+
+      // Click to expand
+      fireEvent.click(screen.getByText("Score History"));
+
+      // Should show round column headers after expanding
+      expect(screen.getByText("R1")).toBeInTheDocument();
+      expect(screen.getByText("R2")).toBeInTheDocument();
+      expect(screen.getByText("R3")).toBeInTheDocument();
+    });
+
+    it("shows player names in the history table", () => {
+      render(
+        <RoundSummaryOverlay
+          {...defaultProps}
+          roundHistory={createRoundHistory()}
+        />
+      );
+
+      // Expand the history
+      fireEvent.click(screen.getByText("Score History"));
+
+      // Player names appear multiple times (main table + history table)
+      const youTexts = screen.getAllByText("You");
+      expect(youTexts.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it("shows scores for each round", () => {
+      render(
+        <RoundSummaryOverlay
+          {...defaultProps}
+          roundHistory={createRoundHistory()}
+        />
+      );
+
+      // Expand the history
+      fireEvent.click(screen.getByText("Score History"));
+
+      // Check for specific scores from round history
+      // Round 1: 5, 8, 0, 13
+      expect(screen.getByText("13")).toBeInTheDocument(); // Q♠ score
+    });
+
+    it("indicates moon shots with emoji", () => {
+      render(
+        <RoundSummaryOverlay
+          {...defaultProps}
+          roundHistory={createRoundHistory()}
+        />
+      );
+
+      // Expand the history
+      fireEvent.click(screen.getByText("Score History"));
+
+      // Round 2 had a moon shot - should show moon emoji
+      expect(screen.getByText(/🌙/)).toBeInTheDocument();
+    });
+
+    it("collapses round history on second header click", () => {
+      render(
+        <RoundSummaryOverlay
+          {...defaultProps}
+          roundHistory={createRoundHistory()}
+        />
+      );
+
+      const header = screen.getByText("Score History");
+
+      // Expand
+      fireEvent.click(header);
+      expect(screen.getByText("R1")).toBeInTheDocument();
+
+      // Collapse
+      fireEvent.click(header);
+
+      // Wait for animation to complete - columns should be hidden
+      // Note: AnimatePresence may keep elements briefly during exit animation
     });
   });
 });

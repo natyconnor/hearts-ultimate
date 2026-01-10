@@ -1,6 +1,14 @@
-import { motion } from "framer-motion";
-import { ChevronRight, Moon, Heart, Sparkles, Star } from "lucide-react";
-import type { Player, Card } from "../types/game";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  ChevronRight,
+  ChevronDown,
+  Moon,
+  Heart,
+  Sparkles,
+  Star,
+  History,
+} from "lucide-react";
+import type { Player, Card, RoundScoreRecord } from "../types/game";
 import { Card as CardComponent } from "./Card";
 import { cn } from "../lib/utils";
 import { DifficultyBadgeIcon } from "./DifficultyBadge";
@@ -20,6 +28,7 @@ interface RoundSummaryOverlayProps {
   totalScores: number[];
   shotTheMoon?: { playerIndex: number } | null;
   pointsCardsTaken?: Card[][]; // Penalty cards (points cards) taken by each player
+  roundHistory?: RoundScoreRecord[]; // History of all rounds played so far
   onNextRound: () => void;
   isLoading?: boolean;
 }
@@ -31,12 +40,17 @@ export function RoundSummaryOverlay({
   totalScores,
   shotTheMoon,
   pointsCardsTaken,
+  roundHistory,
   onNextRound,
   isLoading,
 }: RoundSummaryOverlayProps) {
   // Find who scored the most this round (not great in Hearts!)
   const maxRoundScore = Math.max(...roundScores);
   const minRoundScore = Math.min(...roundScores);
+
+  // State for collapsible sections
+  const [showPointsTaken, setShowPointsTaken] = useState(false);
+  const [showRoundHistory, setShowRoundHistory] = useState(false);
 
   // Play moon sound effect when someone shoots the moon
   useEffect(() => {
@@ -60,14 +74,14 @@ export function RoundSummaryOverlay({
         initial={{ scale: 0.9, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         transition={{ type: "spring", damping: 25, stiffness: 300 }}
-        className="relative max-w-md w-full mx-4 overflow-hidden"
+        className="relative max-w-md w-full mx-4 max-h-[90vh] overflow-hidden rounded-2xl"
       >
         {/* Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 rounded-2xl" />
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(148,163,184,0.1),transparent_50%)]" />
 
-        {/* Content */}
-        <div className="relative p-6">
+        {/* Content - Scrollable */}
+        <div className="relative p-6 max-h-[90vh] overflow-y-auto scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
           {/* Header */}
           <motion.div
             initial={{ opacity: 0, y: -10 }}
@@ -166,7 +180,7 @@ export function RoundSummaryOverlay({
             })}
           </motion.div>
 
-          {/* Points Cards Taken Section */}
+          {/* Points Cards Taken Section - Collapsible */}
           {pointsCardsTaken &&
             pointsCardsTaken.some((cards) => cards.length > 0) && (
               <motion.div
@@ -175,63 +189,213 @@ export function RoundSummaryOverlay({
                 transition={{ delay: 0.4 }}
                 className="bg-black/30 rounded-xl overflow-hidden mb-6"
               >
-                <div className="px-4 py-3 bg-white/5 border-b border-white/10">
-                  <div className="text-sm font-semibold text-white/60">
-                    Cards Taken
+                {/* Collapsible Header */}
+                <button
+                  onClick={() => setShowPointsTaken(!showPointsTaken)}
+                  className="w-full px-4 py-3 bg-white/5 border-b border-white/10 flex items-center justify-between hover:bg-white/10 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Heart className="w-4 h-4 text-red-400" />
+                    <span className="text-sm font-semibold text-white/60">
+                      Points Taken
+                    </span>
+                    <span className="text-xs text-white/40">
+                      (
+                      {pointsCardsTaken.reduce(
+                        (sum, cards) => sum + cards.length,
+                        0
+                      )}{" "}
+                      cards)
+                    </span>
                   </div>
-                </div>
-                {players.map((player, index) => {
-                  const playerCards = pointsCardsTaken[index] || [];
-                  if (playerCards.length === 0) return null;
+                  <motion.div
+                    animate={{ rotate: showPointsTaken ? 180 : 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <ChevronDown className="w-4 h-4 text-white/60" />
+                  </motion.div>
+                </button>
 
-                  return (
+                {/* Collapsible Content */}
+                <AnimatePresence>
+                  {showPointsTaken && (
                     <motion.div
-                      key={`cards-${player.id}`}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.45 + index * 0.05 }}
-                      className="px-4 py-3 border-b border-white/5 last:border-b-0"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden"
                     >
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xs font-medium text-white/70">
-                          {player.name}
-                        </span>
-                        {player.isAI && (
-                          <>
-                            <span className="text-white/50 text-xs">🤖</span>
-                            <DifficultyBadgeIcon
-                              difficulty={player.difficulty}
-                            />
-                          </>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {playerCards.map((card: Card, cardIdx: number) => (
-                          <motion.div
-                            key={`${card.suit}-${card.rank}-${cardIdx}`}
-                            initial={{ scale: 0, rotate: -180 }}
-                            animate={{ scale: 1, rotate: 0 }}
-                            transition={{
-                              delay: 0.5 + index * 0.05 + cardIdx * 0.03,
-                              type: "spring",
-                              stiffness: 200,
-                              damping: 20,
-                            }}
+                      {players.map((player, index) => {
+                        const playerCards = pointsCardsTaken[index] || [];
+                        if (playerCards.length === 0) return null;
+
+                        return (
+                          <div
+                            key={`cards-${player.id}`}
+                            className="px-4 py-3 border-b border-white/5 last:border-b-0"
                           >
-                            <CardComponent
-                              suit={card.suit}
-                              rank={card.rank}
-                              isMini={true}
-                              className="w-10 h-14 md:w-12 md:h-16"
-                            />
-                          </motion.div>
-                        ))}
-                      </div>
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-xs font-medium text-white/70">
+                                {player.name}
+                              </span>
+                              {player.isAI && (
+                                <>
+                                  <span className="text-white/50 text-xs">
+                                    🤖
+                                  </span>
+                                  <DifficultyBadgeIcon
+                                    difficulty={player.difficulty}
+                                  />
+                                </>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {playerCards.map(
+                                (card: Card, cardIdx: number) => (
+                                  <CardComponent
+                                    key={`${card.suit}-${card.rank}-${cardIdx}`}
+                                    suit={card.suit}
+                                    rank={card.rank}
+                                    isMini={true}
+                                    className="w-10 h-14 md:w-12 md:h-16"
+                                  />
+                                )
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </motion.div>
-                  );
-                })}
+                  )}
+                </AnimatePresence>
               </motion.div>
             )}
+
+          {/* Round History Section - Collapsible */}
+          {roundHistory && roundHistory.length > 1 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.45 }}
+              className="bg-black/30 rounded-xl overflow-hidden mb-6"
+            >
+              {/* Collapsible Header */}
+              <button
+                onClick={() => setShowRoundHistory(!showRoundHistory)}
+                className="w-full px-4 py-3 bg-white/5 border-b border-white/10 flex items-center justify-between hover:bg-white/10 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <History className="w-4 h-4 text-white/60" />
+                  <span className="text-sm font-semibold text-white/60">
+                    Score History
+                  </span>
+                  <span className="text-xs text-white/40">
+                    ({roundHistory.length} rounds)
+                  </span>
+                </div>
+                <motion.div
+                  animate={{ rotate: showRoundHistory ? 180 : 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <ChevronDown className="w-4 h-4 text-white/60" />
+                </motion.div>
+              </button>
+
+              {/* Collapsible Content - Score Table */}
+              <AnimatePresence>
+                {showRoundHistory && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        {/* Table Header - Round numbers */}
+                        <thead>
+                          <tr className="border-b border-white/10">
+                            <th className="px-3 py-2 text-left text-white/50 font-medium sticky left-0 bg-slate-900/90">
+                              Player
+                            </th>
+                            {roundHistory.map((round) => (
+                              <th
+                                key={round.roundNumber}
+                                className="px-2 py-2 text-center text-white/50 font-medium min-w-[40px]"
+                              >
+                                R{round.roundNumber}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        {/* Table Body - Player scores per round */}
+                        <tbody>
+                          {players.map((player, playerIdx) => (
+                            <tr
+                              key={player.id}
+                              className="border-b border-white/5 last:border-b-0"
+                            >
+                              <td className="px-3 py-2 sticky left-0 bg-slate-900/90">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-white/80 truncate max-w-[80px]">
+                                    {player.name}
+                                  </span>
+                                  {player.isAI && (
+                                    <>
+                                      <span className="text-white/50 text-xs">
+                                        🤖
+                                      </span>
+                                      <DifficultyBadgeIcon
+                                        difficulty={player.difficulty}
+                                      />
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                              {roundHistory.map((round) => {
+                                const score = round.scores[playerIdx];
+                                const shotMoon =
+                                  round.shotTheMoon?.playerIndex === playerIdx;
+                                return (
+                                  <td
+                                    key={round.roundNumber}
+                                    className="px-2 py-2 text-center"
+                                  >
+                                    <span
+                                      className={cn(
+                                        "font-mono text-xs",
+                                        score === 0 && "text-green-400/70",
+                                        score > 0 &&
+                                          score < 10 &&
+                                          "text-yellow-400/80",
+                                        score >= 10 &&
+                                          score < 20 &&
+                                          "text-orange-400",
+                                        score >= 20 && "text-red-400",
+                                        shotMoon && "text-purple-400"
+                                      )}
+                                      title={
+                                        shotMoon ? "Shot the moon!" : undefined
+                                      }
+                                    >
+                                      {shotMoon && "🌙"}
+                                      {score}
+                                    </span>
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          )}
 
           {/* Progress indicator - how close to game end */}
           <motion.div

@@ -69,7 +69,20 @@ export interface GameState {
   // All penalty cards from a trick go to the trick winner
   pointsCardsTaken?: Card[][]; // Penalty cards taken by each player (indexed by player index)
 
+  // History of scores from all completed rounds (for round summary)
+  roundHistory?: RoundScoreRecord[];
+
   // Moon shooting tracking (set BEFORE scores are adjusted)
+  shotTheMoon?: { playerIndex: number } | null;
+}
+
+/** Scores from a completed round, stored in round history */
+export interface RoundScoreRecord {
+  /** Which round number this was */
+  roundNumber: number;
+  /** Scores each player earned this round (indexed by player index) */
+  scores: number[];
+  /** Whether someone shot the moon this round */
   shotTheMoon?: { playerIndex: number } | null;
 }
 
