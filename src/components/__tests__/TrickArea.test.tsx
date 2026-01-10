@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { TrickArea } from "../TrickArea";
-import type { Player, GameState, Card } from "../../types/game";
+import type { Player, GameState, CardIdentity } from "../../types/game";
 
 const createMockPlayer = (
   id: string,
@@ -68,9 +68,9 @@ describe("TrickArea", () => {
       createMockPlayer("p4", "Player 4"),
     ];
 
-    const displayTrick: Array<{ playerId: string; card: Card }> = [
-      { playerId: "p1", card: { suit: "spades", rank: "A" } },
-      { playerId: "p2", card: { suit: "hearts", rank: "K" } },
+    const displayTrick: Array<{ playerId: string; card: CardIdentity }> = [
+      { playerId: "p1", card: { suit: "spades", rank: 14 } },
+      { playerId: "p2", card: { suit: "hearts", rank: 13 } },
     ];
 
     render(
@@ -97,11 +97,11 @@ describe("TrickArea", () => {
       createMockPlayer("p4", "Diana"),
     ];
 
-    const displayTrick: Array<{ playerId: string; card: Card }> = [
-      { playerId: "p1", card: { suit: "spades", rank: "A" } },
-      { playerId: "p2", card: { suit: "spades", rank: "K" } },
-      { playerId: "p3", card: { suit: "spades", rank: "Q" } },
-      { playerId: "p4", card: { suit: "spades", rank: "J" } },
+    const displayTrick: Array<{ playerId: string; card: CardIdentity }> = [
+      { playerId: "p1", card: { suit: "spades", rank: 14 } },
+      { playerId: "p2", card: { suit: "spades", rank: 13 } },
+      { playerId: "p3", card: { suit: "spades", rank: 12 } },
+      { playerId: "p4", card: { suit: "spades", rank: 11 } },
     ];
 
     const gameState = createMockGameState({
@@ -131,8 +131,8 @@ describe("TrickArea", () => {
       createMockPlayer("p4", "Diana"),
     ];
 
-    const displayTrick: Array<{ playerId: string; card: Card }> = [
-      { playerId: "p1", card: { suit: "spades", rank: "A" } },
+    const displayTrick: Array<{ playerId: string; card: CardIdentity }> = [
+      { playerId: "p1", card: { suit: "spades", rank: 14 } },
     ];
 
     const gameState = createMockGameState({
@@ -162,8 +162,8 @@ describe("TrickArea", () => {
       createMockPlayer("p4", "Diana"),
     ];
 
-    const displayTrick: Array<{ playerId: string; card: Card }> = [
-      { playerId: "p1", card: { suit: "spades", rank: "A" } },
+    const displayTrick: Array<{ playerId: string; card: CardIdentity }> = [
+      { playerId: "p1", card: { suit: "spades", rank: 14 } },
     ];
 
     const gameState = createMockGameState({

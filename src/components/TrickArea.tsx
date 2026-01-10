@@ -7,10 +7,10 @@ import {
   getWinnerPosition,
   gameIndexToVisualPosition,
 } from "../game/cardDisplay";
-import type { Card as CardType, Player, GameState } from "../types/game";
+import type { CardIdentity, Player, GameState } from "../types/game";
 
 interface TrickAreaProps {
-  displayTrick: Array<{ playerId: string; card: CardType }>;
+  displayTrick: Array<{ playerId: string; card: CardIdentity }>;
   players: Player[];
   gameState: GameState | null;
   myGameIndex: number;

@@ -11,6 +11,11 @@ import { createPlayer } from "../../test/testUtils";
 import type { UseMutationResult } from "@tanstack/react-query";
 import type { AIDifficulty } from "../../types/game";
 
+// Mock react-router-dom
+vi.mock("react-router-dom", () => ({
+  useNavigate: () => vi.fn(),
+}));
+
 // Mock SoundSettings component
 vi.mock("../SoundSettings", () => ({
   SoundSettings: () => <div>SoundSettings</div>,
