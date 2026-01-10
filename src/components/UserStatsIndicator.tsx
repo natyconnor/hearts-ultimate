@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../hooks/useAuth";
 import { AccountLinkModal } from "./AccountLinkModal";
 
 /**
@@ -33,7 +33,9 @@ export function UserStatsIndicator() {
         <div className="text-xs text-white/40 space-x-3">
           <span>{stats.games_played} games</span>
           <span>•</span>
-          <span>{stats.games_won} wins ({winRate}%)</span>
+          <span>
+            {stats.games_won} wins ({winRate}%)
+          </span>
           {stats.moons_shot > 0 && (
             <>
               <span>•</span>

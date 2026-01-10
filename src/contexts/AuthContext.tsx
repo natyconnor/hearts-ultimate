@@ -1,38 +1,10 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { supabase } from "../supabaseClient";
 import type { User } from "@supabase/supabase-js";
+import { AuthContext, type UserStats } from "./authContextDef";
 
-export interface UserStats {
-  games_played: number;
-  games_won: number;
-  total_points_taken: number;
-  moons_shot: number;
-}
-
-interface AuthContextType {
-  /** The current Supabase user (anonymous or linked) */
-  user: User | null;
-  /** True while checking/creating session on initial load */
-  isLoading: boolean;
-  /** True if user hasn't linked to email/OAuth yet */
-  isAnonymous: boolean;
-  /** User's game statistics */
-  stats: UserStats | null;
-  /** Refresh stats from database */
-  refreshStats: () => Promise<void>;
-  /** Link anonymous account to email/password */
-  linkWithEmail: (email: string, password: string) => Promise<void>;
-  /** Link anonymous account to OAuth provider (Google, GitHub, etc.) */
-  linkWithOAuth: (provider: "google" | "github") => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextType | null>(null);
+// Re-export types for convenience
+export type { UserStats } from "./authContextDef";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -115,7 +87,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     // Refresh user to get updated state
-    const { data: { user: updatedUser } } = await supabase.auth.getUser();
+    const {
+      data: { user: updatedUser },
+    } = await supabase.auth.getUser();
     if (updatedUser) {
       setUser(updatedUser);
     }
@@ -152,10 +126,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
-  return ctx;
 }

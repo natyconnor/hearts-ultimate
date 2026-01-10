@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { supabase } from "../supabaseClient";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "./useAuth";
 
 interface GameResult {
   won: boolean;
