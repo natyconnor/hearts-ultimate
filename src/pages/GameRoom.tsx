@@ -7,6 +7,7 @@ import { useGameRealtime } from "../hooks/useGameRealtime";
 import { useRoomSync } from "../hooks/useRoomSync";
 import { useRoomNavigationBlocker } from "../hooks/useRoomNavigationBlocker";
 import { usePageUnloadWarning } from "../hooks/usePageUnloadWarning";
+import { useRecordGameResult } from "../hooks/useRecordGameResult";
 import {
   useLobbyMutations,
   useGameplayMutations,
@@ -167,6 +168,13 @@ export function GameRoom() {
     isPlayerInRoom,
     roomStatus,
     enabled: !!(slug && room && (currentPlayerId || currentSpectatorId)),
+  });
+
+  // Record game stats when game ends (silently, in background)
+  useRecordGameResult({
+    gameState: currentGameState,
+    currentPlayerId,
+    showGameEnd,
   });
 
   // Auto-spectate: When visiting a room that's already playing and not a player,

@@ -26,6 +26,7 @@ import {
   CreateGameSection,
   type TestDifficulty,
 } from "../components/CreateGameSection";
+import { UserStatsIndicator } from "../components/UserStatsIndicator";
 
 // Floating card component for background decoration
 function FloatingCard({
@@ -407,6 +408,9 @@ export function Home() {
           isJoiningRoom={joinRoomMutation.isPending}
           error={createRoomMutation.error || joinRoomMutation.error}
         />
+
+        {/* User stats - subtle, only shows after playing */}
+        <UserStatsIndicator />
 
         {/* Decorative card suits at bottom */}
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-5 text-3xl opacity-30">

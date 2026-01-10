@@ -6,6 +6,7 @@ import {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Home } from "./pages/Home";
 import { GameRoom } from "./pages/GameRoom";
+import { AuthProvider } from "./contexts/AuthContext";
 
 const queryClient = new QueryClient();
 
@@ -33,7 +34,9 @@ const router = createBrowserRouter([
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
