@@ -11,6 +11,7 @@ import {
 } from "../lib/styles";
 import { useEffect, useState } from "react";
 import { playSound } from "../lib/sounds";
+import { GAME_CONFIG } from "../lib/constants";
 
 interface RoundSummaryOverlayProps {
   players: Player[];
@@ -241,7 +242,7 @@ export function RoundSummaryOverlay({
           >
             <div className="flex justify-between text-xs text-white/50 mb-1">
               <span>Game progress</span>
-              <span>100 points to end</span>
+              <span>{GAME_CONFIG.GAME_END_SCORE} points to end</span>
             </div>
             <div className="h-2 bg-white/10 rounded-full overflow-hidden">
               <motion.div
@@ -249,7 +250,8 @@ export function RoundSummaryOverlay({
                 animate={{
                   width: `${Math.min(
                     100,
-                    (Math.max(...totalScores) / 100) * 100
+                    (Math.max(...totalScores) / GAME_CONFIG.GAME_END_SCORE) *
+                      100
                   )}%`,
                 }}
                 transition={{ delay: 0.6, duration: 0.5 }}

@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from "../../test/testUtils";
 import { RoundSummaryOverlay } from "../RoundSummaryOverlay";
 import { createTestPlayers, createCard } from "../../test/testUtils";
 import type { Card } from "../../types/game";
+import { GAME_CONFIG } from "../../lib/constants";
 
 // Mock the sound module
 vi.mock("../../lib/sounds", () => ({
@@ -145,7 +146,9 @@ describe("RoundSummaryOverlay Component", () => {
       render(<RoundSummaryOverlay {...defaultProps} />);
 
       expect(screen.getByText("Game progress")).toBeInTheDocument();
-      expect(screen.getByText("100 points to end")).toBeInTheDocument();
+      expect(
+        screen.getByText(`${GAME_CONFIG.GAME_END_SCORE} points to end`)
+      ).toBeInTheDocument();
     });
 
     it("displays highest and lowest scores", () => {

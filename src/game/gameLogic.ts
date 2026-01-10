@@ -13,6 +13,7 @@ import {
 } from "./rules";
 import { getPassDirection } from "./passingLogic";
 import { cardsEqual } from "./cardDisplay";
+import { GAME_CONFIG } from "../lib/constants";
 
 /**
  * Plays a card and updates the game state
@@ -132,8 +133,10 @@ export function playCard(
         (score, index) => score + finalRoundScores[index]
       );
 
-      // Check if game is over (someone has 100+ points)
-      const gameOver = updatedScores.some((score) => score >= 100);
+      // Check if game is over (someone has reached the game end score)
+      const gameOver = updatedScores.some(
+        (score) => score >= GAME_CONFIG.GAME_END_SCORE
+      );
 
       // Find game winner (player with lowest score)
       let gameWinnerIndex: number | undefined;

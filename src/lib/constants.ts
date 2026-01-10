@@ -12,4 +12,5 @@ export const GAME_CONFIG = {
   MAX_PLAYERS: 4,
   CARDS_PER_PLAYER: 13,
   TOTAL_CARDS: 52,
+  GAME_END_SCORE: 100, // Game ends when any player reaches this score or higher
 } as const;
