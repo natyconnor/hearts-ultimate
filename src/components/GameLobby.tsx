@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, Copy, Check, Eye } from "lucide-react";
+import { ChevronDown, Copy, Check, Eye, Home } from "lucide-react";
 import { SoundSettings } from "./SoundSettings";
 import { cn } from "../lib/utils";
 import { getDifficultyDisplayName } from "../lib/aiPlayers";
@@ -75,6 +76,7 @@ export function GameLobby({
   spectatorMutations,
   realtimeError,
 }: GameLobbyProps) {
+  const navigate = useNavigate();
   const [openDifficultyMenu, setOpenDifficultyMenu] = useState<string | null>(
     null
   );
@@ -194,9 +196,23 @@ export function GameLobby({
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-poker-green via-green-800 to-poker-green flex items-center justify-center p-4 relative">
-      {/* Sound Settings - Top Left */}
-      <div className="absolute top-4 left-4 z-10">
+      {/* Top Left Controls - Sound Settings & Home */}
+      <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
         <SoundSettings />
+        <button
+          onClick={() => navigate("/")}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-lg",
+            "bg-white/90 hover:bg-white",
+            "text-gray-700 hover:text-poker-green",
+            "shadow-md hover:shadow-lg",
+            "transition-all duration-200",
+            "font-medium text-sm"
+          )}
+        >
+          <Home className="w-4 h-4" />
+          <span>Home</span>
+        </button>
       </div>
       <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-2xl w-full">
         <div className="flex items-center justify-between mb-6">

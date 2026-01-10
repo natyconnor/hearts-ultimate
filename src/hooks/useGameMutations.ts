@@ -31,7 +31,13 @@ import {
 import { useAIDebugStore } from "../store/aiDebugStore";
 import { playSound } from "../lib/sounds";
 import { STORAGE_KEYS } from "../lib/constants";
-import type { GameState, Player, Card, AIDifficulty, Spectator } from "../types/game";
+import type {
+  GameState,
+  Player,
+  Card,
+  AIDifficulty,
+  Spectator,
+} from "../types/game";
 
 interface RoomData {
   id: string;
@@ -52,7 +58,11 @@ interface UseLobbyMutationsParams {
   currentPlayerId: string | null;
   updateGameState: (gameState: GameState) => void;
   setCurrentPlayerId: (id: string | null) => void;
-  setCurrentRoom: (room: { roomId: string; slug: string; status: "waiting" | "playing" | "finished" }) => void;
+  setCurrentRoom: (room: {
+    roomId: string;
+    slug: string;
+    status: "waiting" | "playing" | "finished";
+  }) => void;
   setSelectedCardsToPass: (cards: Card[]) => void;
 }
 
@@ -593,7 +603,6 @@ export function useSpectatorMutations({
   setSpectatorId,
   setSpectators,
 }: UseSpectatorMutationsParams) {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const joinSpectator = useMutation({
@@ -637,7 +646,7 @@ export function useSpectatorMutations({
     onSuccess: (updatedSpectators) => {
       setSpectators(updatedSpectators);
       queryClient.invalidateQueries({ queryKey: ["room", slug] });
-      navigate("/");
+      // Stay in the lobby - user can join as player or spectate again
     },
   });
 
