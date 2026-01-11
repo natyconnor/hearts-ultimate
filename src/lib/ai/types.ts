@@ -18,8 +18,10 @@ export type { AIDifficulty } from "../../types/game";
  * v6: Proactive moon shooting, detection, and prevention
  * v7: Fixed players after us bug and ducking evaluation
  * v8: Fixed mid-range cards scoring 0 during passing
+ * v9: Dynamic aggressiveness factor for Hard AI variety
+ * v10: Leader targeting - aggressive AI holds cards to dump on game leader
  */
-export const AI_VERSION = 8;
+export const AI_VERSION = 10;
 
 /** Context for play decisions */
 export interface PlayContext {
@@ -101,4 +103,25 @@ export interface AIConfig {
   memoryTrickCount: number;
   moonDetectionThreshold: number;
   leaderPointThreshold: number;
+}
+
+/**
+ * Aggressiveness modifiers computed from current aggressiveness level.
+ * These are multipliers/adjustments applied to scoring constants.
+ */
+export interface AggressivenessModifiers {
+  /** Multiplier for moon attempt threshold (lower = more likely to attempt) */
+  moonThresholdAdjustment: number;
+  /** Multiplier for duck preference score */
+  duckPreferenceMultiplier: number;
+  /** Multiplier for risk of dump penalty */
+  riskToleranceMultiplier: number;
+  /** Bonus added to high card dump scores */
+  highCardDumpBonus: number;
+  /** Adjusted bluff probability */
+  bluffProbability: number;
+  /** Adjusted leader targeting threshold */
+  leaderTargetThreshold: number;
+  /** Factor for holding cards to target the leader (0 = dump anyone, 0.7 = strongly prefer leader) */
+  leaderTargetingFactor: number;
 }

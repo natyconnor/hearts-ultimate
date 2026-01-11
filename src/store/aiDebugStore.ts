@@ -26,6 +26,9 @@ export interface AIDebugLog {
     cardsTracked?: number;
     tricksCounted?: number;
     voidPlayers?: string[];
+    // Aggressiveness tracking (Hard AI only)
+    aggressiveness?: number;
+    baseAggressiveness?: number;
   };
   aiVersion: number; // Version of AI code that generated this log
 }

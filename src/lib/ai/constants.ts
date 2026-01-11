@@ -122,3 +122,49 @@ export const DEFAULT_AI_CONFIG = {
   moonDetectionThreshold: 20,
   leaderPointThreshold: 15,
 } as const;
+
+/**
+ * Aggressiveness system constants
+ *
+ * Aggressiveness scale: 0.0 (very conservative) to 1.0 (very aggressive)
+ * - 0.0-0.3: Conservative - protect lead, duck often, avoid risky plays
+ * - 0.4-0.6: Balanced - current Hard AI behavior
+ * - 0.7-1.0: Aggressive - take risks, shoot moon more, dump high cards
+ */
+export const AGGRESSIVENESS = {
+  /** Base aggressiveness range (random at game start) */
+  BASE_MIN: 0.3,
+  BASE_MAX: 0.7,
+
+  /** Score adjustment calculation */
+  SCORE_DIVISOR: 60, // Points behind/ahead to reach max adjustment
+  MAX_ADJUSTMENT: 0.3, // Maximum score-based adjustment (+/-)
+
+  /** Moon threshold adjustment */
+  MOON_BASE_THRESHOLD: 75,
+  MOON_THRESHOLD_RANGE: 30, // Full range of adjustment (+/- 15 from base)
+
+  /** Duck preference multiplier range */
+  DUCK_MULTIPLIER_BASE: 1.4,
+  DUCK_MULTIPLIER_FACTOR: 0.8, // Subtracted * aggressiveness
+
+  /** Risk tolerance multiplier range (same formula as duck) */
+  RISK_MULTIPLIER_BASE: 1.4,
+  RISK_MULTIPLIER_FACTOR: 0.8,
+
+  /** High card dump bonus */
+  HIGH_CARD_DUMP_MAX_BONUS: 25,
+
+  /** Bluff probability range */
+  BLUFF_BASE: 0.08,
+  BLUFF_RANGE: 0.22, // Added * aggressiveness
+
+  /** Leader targeting threshold range */
+  LEADER_THRESHOLD_BASE: 25,
+  LEADER_THRESHOLD_RANGE: 15, // Subtracted * aggressiveness
+
+  /** Leader targeting: aggressive players hold cards for the leader */
+  LEADER_TARGETING_MAX: 0.7, // Max factor at 100% aggression
+  LATE_ROUND_TRICK_THRESHOLD: 10, // After this, reduce holding behavior
+  LATE_ROUND_HOLD_REDUCTION: 0.5, // Halve targeting factor late game
+} as const;

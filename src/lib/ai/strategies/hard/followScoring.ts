@@ -6,7 +6,12 @@
  */
 
 import type { Card } from "../../../../types/game";
-import type { PlayContext, ScoredCard, AIConfig } from "../../types";
+import type {
+  PlayContext,
+  ScoredCard,
+  AIConfig,
+  AggressivenessModifiers,
+} from "../../types";
 import { RANK, FOLLOW_SCORES } from "../../constants";
 import { isQueenOfSpades } from "../../../../game/rules";
 import {
@@ -24,7 +29,8 @@ export function scoreFollowCards(
   memory: CardMemory,
   config: AIConfig,
   moonShooterIndex: number | null,
-  attemptingMoon = false
+  attemptingMoon = false,
+  modifiers?: AggressivenessModifiers
 ): ScoredCard[] {
   const { currentTrickCards, leadSuit } = context;
 
@@ -34,6 +40,10 @@ export function scoreFollowCards(
 
   const sortedCards = [...cardsOfSuit].sort((a, b) => a.rank - b.rank);
   const forcedToWin = sortedCards[0].rank > currentHighest;
+
+  // Apply aggressiveness modifiers (default to neutral if not provided)
+  const duckMultiplier = modifiers?.duckPreferenceMultiplier ?? 1;
+  const riskMultiplier = modifiers?.riskToleranceMultiplier ?? 1;
 
   return cardsOfSuit.map((card) => {
     const wouldWin = card.rank > currentHighest;
@@ -54,7 +64,7 @@ export function scoreFollowCards(
       return { card, score, reasons };
     }
 
-    // High spades risky when Q♠ still out
+    // High spades risky when Q♠ still out (apply risk multiplier)
     const queenAccountedFor =
       isQueenOfSpadesInTrick(currentTrickCards) ||
       memory.isQueenOfSpadesPlayed();
@@ -66,7 +76,7 @@ export function scoreFollowCards(
       !queenAccountedFor &&
       !context.isFirstTrick
     ) {
-      score += FOLLOW_SCORES.RISK_OF_DUMP * 2;
+      score += FOLLOW_SCORES.RISK_OF_DUMP * 2 * riskMultiplier;
       reasons.push("High spade risk - Q♠ still out");
     }
 
@@ -83,10 +93,13 @@ export function scoreFollowCards(
         reasons,
         (adj) => {
           score += adj;
-        }
+        },
+        riskMultiplier,
+        modifiers?.bluffProbability
       );
     } else {
-      score += FOLLOW_SCORES.DUCK;
+      // Apply duck preference multiplier - more aggressive = lower duck preference
+      score += FOLLOW_SCORES.DUCK * duckMultiplier;
       reasons.push("Ducking");
 
       // When stopping moon: save high cards. Otherwise: play highest that still ducks.
@@ -149,7 +162,9 @@ function scoreWinningPlay(
   forcedToWin: boolean,
   moonShooterIndex: number | null,
   reasons: string[],
-  addScore: (adj: number) => void
+  addScore: (adj: number) => void,
+  riskMultiplier: number = 1,
+  bluffProbability?: number
 ): void {
   // First trick is always safe
   if (context.isFirstTrick) {
@@ -179,11 +194,13 @@ function scoreWinningPlay(
     reasons.push("Safe win as last player");
     addScore(card.rank * FOLLOW_SCORES.TRICK_1_RANK_MULTIPLIER);
   } else {
-    scoreRiskyWin(card, context, memory, forcedToWin, reasons, addScore);
+    scoreRiskyWin(card, context, memory, forcedToWin, reasons, addScore, riskMultiplier);
   }
 
-  // Bluffing
-  if (shouldBluff(context, config) && penaltyPoints === 0 && lastToPlay) {
+  // Bluffing - use aggressiveness-adjusted probability if provided
+  const effectiveBluffProb = bluffProbability ?? config.bluffProbability;
+  const configForBluff = { ...config, bluffProbability: effectiveBluffProb };
+  if (shouldBluff(context, configForBluff) && penaltyPoints === 0 && lastToPlay) {
     addScore(FOLLOW_SCORES.BLUFF_TAKE_SAFE);
     reasons.push("Bluff - take safe trick");
   }
@@ -234,7 +251,8 @@ function scoreRiskyWin(
   memory: CardMemory,
   forcedToWin: boolean,
   reasons: string[],
-  addScore: (adj: number) => void
+  addScore: (adj: number) => void,
+  riskMultiplier: number = 1
 ): void {
   const { gameState, leadSuit, currentTrickCards } = context;
 
@@ -256,8 +274,9 @@ function scoreRiskyWin(
   }
 
   // Known void = NEVER safe. Don't even consider "likely safe".
+  // Apply risk multiplier - aggressive AI takes this penalty less seriously
   if (voidPlayersAhead > 0) {
-    addScore(FOLLOW_SCORES.RISK_OF_DUMP * 3);
+    addScore(FOLLOW_SCORES.RISK_OF_DUMP * 3 * riskMultiplier);
     reasons.push("Known void player(s) ahead - DUCK!");
     return;
   }
@@ -274,8 +293,8 @@ function scoreRiskyWin(
       reasons.push("Dump high card");
     }
   } else {
-    // Early game, no info yet - slight risk
-    addScore(FOLLOW_SCORES.RISK_OF_DUMP);
+    // Early game, no info yet - slight risk (apply risk multiplier)
+    addScore(FOLLOW_SCORES.RISK_OF_DUMP * riskMultiplier);
     reasons.push("Risk of penalty dump");
   }
 }

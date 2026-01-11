@@ -6,8 +6,13 @@
  */
 
 import type { Card } from "../../../../types/game";
-import type { PlayContext, ScoredCard, AIConfig } from "../../types";
-import { RANK, DUMP_SCORES } from "../../constants";
+import type {
+  PlayContext,
+  ScoredCard,
+  AIConfig,
+  AggressivenessModifiers,
+} from "../../types";
+import { RANK, DUMP_SCORES, AGGRESSIVENESS } from "../../constants";
 import {
   isQueenOfSpades,
   isHeart,
@@ -23,7 +28,8 @@ export function scoreDumpCards(
   memory: CardMemory,
   config: AIConfig,
   moonShooterIndex: number | null,
-  attemptingMoon = false
+  attemptingMoon = false,
+  modifiers?: AggressivenessModifiers
 ): ScoredCard[] {
   if (attemptingMoon) {
     return scoreMoonDump(validCards);
@@ -34,7 +40,16 @@ export function scoreDumpCards(
     currentTrickCards,
     gameState
   );
-  const leaderIndex = findLeader(gameState, config);
+
+  // Use aggressiveness-adjusted leader threshold if provided
+  const effectiveConfig = modifiers
+    ? { ...config, leaderPointThreshold: modifiers.leaderTargetThreshold }
+    : config;
+  const leaderIndex = findLeader(gameState, effectiveConfig);
+
+  // Bonus for dumping high cards (aggressive AI dumps more readily)
+  const highCardDumpBonus = modifiers?.highCardDumpBonus ?? 0;
+  const trickNumber = context.tricksPlayedThisRound + 1;
 
   return validCards.map((card) => {
     let score = DUMP_SCORES.BASE;
@@ -43,8 +58,11 @@ export function scoreDumpCards(
     if (isQueenOfSpades(card)) {
       scoreQueenDump(
         currentWinnerIndex,
+        leaderIndex,
         moonShooterIndex,
         playerIndex,
+        trickNumber,
+        modifiers,
         reasons,
         (adj) => {
           score += adj;
@@ -56,8 +74,11 @@ export function scoreDumpCards(
       scoreHeartDump(
         card,
         currentWinnerIndex,
+        leaderIndex,
         moonShooterIndex,
         playerIndex,
+        trickNumber,
+        modifiers,
         reasons,
         (adj) => {
           score += adj;
@@ -65,15 +86,8 @@ export function scoreDumpCards(
       );
     }
 
-    // Target leader
-    if (
-      leaderIndex !== null &&
-      currentWinnerIndex === leaderIndex &&
-      isPenaltyCard(card)
-    ) {
-      score += DUMP_SCORES.DUMP_ON_LEADER;
-      reasons.push("Dump on leader");
-    }
+    // Note: "Dump on leader" bonus is now handled inside scoreQueenDump/scoreHeartDump
+    // for penalty cards, so we only add it here for non-penalty high cards if needed
 
     // High non-penalty cards
     if (card.rank >= RANK.HIGH_THRESHOLD && !isPenaltyCard(card)) {
@@ -83,7 +97,8 @@ export function scoreDumpCards(
         score -= 40 - card.rank * 0.5;
         reasons.push("Keep high card (moon defense)");
       } else {
-        score += card.rank * DUMP_SCORES.HIGH_CARD_RANK_MULTIPLIER;
+        // Add aggressiveness bonus - aggressive AI dumps high cards more readily
+        score += card.rank * DUMP_SCORES.HIGH_CARD_RANK_MULTIPLIER + highCardDumpBonus;
         reasons.push("Dump high card");
       }
     }
@@ -142,11 +157,15 @@ function scoreMoonDump(validCards: Card[]): ScoredCard[] {
 
 function scoreQueenDump(
   currentWinnerIndex: number | null,
+  leaderIndex: number | null,
   moonShooterIndex: number | null,
   playerIndex: number,
+  trickNumber: number,
+  modifiers: AggressivenessModifiers | undefined,
   reasons: string[],
   addScore: (adj: number) => void
 ): void {
+  // Moon defense takes priority
   if (moonShooterIndex !== null && moonShooterIndex !== playerIndex) {
     if (currentWinnerIndex === moonShooterIndex) {
       addScore(DUMP_SCORES.DONT_GIVE_QUEEN_TO_SHOOTER);
@@ -155,34 +174,97 @@ function scoreQueenDump(
       addScore(DUMP_SCORES.DUMP_ON_NON_SHOOTER);
       reasons.push("Dump Q♠ on non-shooter");
     }
-  } else {
-    addScore(DUMP_SCORES.QUEEN_OF_SPADES);
+    return;
+  }
+
+  const baseBonus = DUMP_SCORES.QUEEN_OF_SPADES; // 200
+  const winnerIsLeader =
+    leaderIndex !== null && currentWinnerIndex === leaderIndex;
+
+  if (winnerIsLeader) {
+    // Dump on leader! Full bonus + targeting bonus
+    addScore(baseBonus + DUMP_SCORES.DUMP_ON_LEADER);
+    reasons.push("Dump Q♠ on leader!");
+  } else if (!modifiers || modifiers.leaderTargetingFactor < 0.1) {
+    // Conservative: just dump it
+    addScore(baseBonus);
     reasons.push("Dump Q♠!");
+  } else {
+    // Aggressive: consider holding for leader
+    let holdFactor = modifiers.leaderTargetingFactor;
+
+    // Late round: reduce holding behavior (desperation)
+    if (trickNumber >= AGGRESSIVENESS.LATE_ROUND_TRICK_THRESHOLD) {
+      holdFactor *= AGGRESSIVENESS.LATE_ROUND_HOLD_REDUCTION;
+    }
+
+    // Reduce bonus based on hold factor
+    // At factor 0.7: bonus becomes 200 * 0.3 = 60
+    const adjustedBonus = baseBonus * (1 - holdFactor);
+    addScore(adjustedBonus);
+
+    if (holdFactor > 0.3) {
+      reasons.push("Hold Q♠ for leader");
+    } else {
+      reasons.push("Dump Q♠!");
+    }
   }
 }
 
 function scoreHeartDump(
   card: Card,
   currentWinnerIndex: number | null,
+  leaderIndex: number | null,
   moonShooterIndex: number | null,
   playerIndex: number,
+  trickNumber: number,
+  modifiers: AggressivenessModifiers | undefined,
   reasons: string[],
   addScore: (adj: number) => void
 ): void {
+  const baseBonus =
+    DUMP_SCORES.HEART_BASE + card.rank * DUMP_SCORES.HEART_RANK_MULTIPLIER;
+
+  // Moon defense takes priority
   if (moonShooterIndex !== null && moonShooterIndex !== playerIndex) {
     if (currentWinnerIndex === moonShooterIndex) {
       addScore(DUMP_SCORES.DONT_GIVE_HEARTS_TO_SHOOTER);
       reasons.push("Don't give hearts to shooter");
     } else {
-      addScore(
-        DUMP_SCORES.HEART_BASE + card.rank * DUMP_SCORES.HEART_RANK_MULTIPLIER
-      );
+      addScore(baseBonus);
       reasons.push("Dump heart on non-shooter");
     }
-  } else {
-    addScore(
-      DUMP_SCORES.HEART_BASE + card.rank * DUMP_SCORES.HEART_RANK_MULTIPLIER
-    );
+    return;
+  }
+
+  const winnerIsLeader =
+    leaderIndex !== null && currentWinnerIndex === leaderIndex;
+
+  if (winnerIsLeader) {
+    // Dump on leader! Full bonus + targeting bonus
+    addScore(baseBonus + DUMP_SCORES.DUMP_ON_LEADER);
+    reasons.push("Dump heart on leader!");
+  } else if (!modifiers || modifiers.leaderTargetingFactor < 0.1) {
+    // Conservative: just dump it
+    addScore(baseBonus);
     reasons.push("Dump heart");
+  } else {
+    // Aggressive: consider holding for leader (hearts use half the factor - less critical)
+    let holdFactor = modifiers.leaderTargetingFactor * 0.5;
+
+    // Late round: reduce holding behavior (desperation)
+    if (trickNumber >= AGGRESSIVENESS.LATE_ROUND_TRICK_THRESHOLD) {
+      holdFactor *= AGGRESSIVENESS.LATE_ROUND_HOLD_REDUCTION;
+    }
+
+    // Reduce bonus based on hold factor
+    const adjustedBonus = baseBonus * (1 - holdFactor);
+    addScore(adjustedBonus);
+
+    if (holdFactor > 0.15) {
+      reasons.push("Hold heart for leader");
+    } else {
+      reasons.push("Dump heart");
+    }
   }
 }

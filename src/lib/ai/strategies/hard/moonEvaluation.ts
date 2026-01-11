@@ -44,10 +44,21 @@ const MOON_EVAL = {
   LOW_CARD_PENALTY_PER_CARD: -3,
 } as const;
 
-export function evaluateMoonPotential(hand: Card[]): MoonEvaluation {
+/**
+ * Evaluates whether a hand is suitable for shooting the moon.
+ *
+ * @param hand The player's hand
+ * @param thresholdAdjustment Adjustment to the attempt threshold from aggressiveness
+ *                            (negative = more likely to attempt, positive = less likely)
+ */
+export function evaluateMoonPotential(
+  hand: Card[],
+  thresholdAdjustment: number = 0
+): MoonEvaluation {
   let score = 0;
   const reasons: string[] = [];
   const distribution = getSuitDistribution(hand);
+  const adjustedThreshold = MOON_EVAL.ATTEMPT_THRESHOLD + thresholdAdjustment;
 
   // Critical cards
   const hasAceOfHearts = hand.some(
@@ -150,7 +161,7 @@ export function evaluateMoonPotential(hand: Card[]): MoonEvaluation {
 
   const confidence = Math.max(0, Math.min(100, score));
   return {
-    shouldAttempt: score >= MOON_EVAL.ATTEMPT_THRESHOLD,
+    shouldAttempt: score >= adjustedThreshold,
     confidence,
     reasons,
     score,

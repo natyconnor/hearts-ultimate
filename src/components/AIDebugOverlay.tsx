@@ -206,6 +206,22 @@ function LogItem({
                 Memory State
               </h4>
               <div className="text-[10px] space-y-1 text-slate-400">
+                {log.memorySnapshot.aggressiveness !== undefined && (
+                  <div className="text-amber-400">
+                    Aggro:{" "}
+                    {(log.memorySnapshot.aggressiveness * 100).toFixed(0)}%
+                    {log.memorySnapshot.baseAggressiveness !== undefined && (
+                      <span className="text-slate-500">
+                        {" "}
+                        (base:{" "}
+                        {(log.memorySnapshot.baseAggressiveness * 100).toFixed(
+                          0
+                        )}
+                        %)
+                      </span>
+                    )}
+                  </div>
+                )}
                 <div>
                   Remembered: {log.memorySnapshot.cardsRememberedCount} cards
                 </div>
@@ -269,6 +285,12 @@ Format: [Round|Player|Diff|Action] Context -> Decision | (Alternatives...) | {Me
 
       const memory = log.memorySnapshot
         ? `{Mem:${log.memorySnapshot.cardsRememberedCount}${
+            log.memorySnapshot.aggressiveness !== undefined
+              ? `|Aggro:${(log.memorySnapshot.aggressiveness * 100).toFixed(
+                  0
+                )}%`
+              : ""
+          }${
             log.memorySnapshot.moonShooterCandidate
               ? `|Moon:${log.memorySnapshot.moonShooterCandidate}`
               : ""

@@ -6,7 +6,7 @@
  */
 
 import type { Card, GameState } from "../../../../types/game";
-import type { PlayContext, ScoredCard } from "../../types";
+import type { PlayContext, ScoredCard, AggressivenessModifiers } from "../../types";
 import { RANK, LEAD_SCORES, THRESHOLDS } from "../../constants";
 import { isQueenOfSpades, isHeart } from "../../../../game/rules";
 import type { CardMemory } from "../../memory/cardMemory";
@@ -15,9 +15,15 @@ export function scoreLeadCards(
   context: PlayContext,
   memory: CardMemory,
   moonShooterIndex: number | null,
-  attemptingMoon = false
+  attemptingMoon = false,
+  modifiers?: AggressivenessModifiers
 ): ScoredCard[] {
   const { validCards, gameState, playerIndex } = context;
+
+  // Aggressive AI is more willing to lead higher cards to force action
+  const rankPenaltyMultiplier = modifiers
+    ? LEAD_SCORES.RANK_PENALTY_MULTIPLIER * modifiers.riskToleranceMultiplier
+    : LEAD_SCORES.RANK_PENALTY_MULTIPLIER;
 
   return validCards.map((card) => {
     if (attemptingMoon) {
@@ -28,7 +34,8 @@ export function scoreLeadCards(
     const reasons: string[] = [];
 
     // Prefer low cards (less likely to win)
-    score -= card.rank * LEAD_SCORES.RANK_PENALTY_MULTIPLIER;
+    // Aggressive AI has reduced penalty for high cards
+    score -= card.rank * rankPenaltyMultiplier;
 
     if (isHeart(card)) {
       scoreHeartLead(card, gameState, playerIndex, memory, reasons, (adj) => {

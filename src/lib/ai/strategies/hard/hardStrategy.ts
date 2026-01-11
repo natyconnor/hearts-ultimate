@@ -9,6 +9,7 @@ import type {
   PassContext,
   ScoredCard,
   AIConfig,
+  AggressivenessModifiers,
 } from "../../types";
 import { AI_VERSION } from "../../types";
 import {
@@ -34,6 +35,12 @@ import {
   scoreMoonPassCards,
   type MoonEvaluation,
 } from "./moonEvaluation";
+import {
+  generateBaseAggressiveness,
+  getEffectiveAggressiveness,
+  getAggressivenessModifiers,
+  getAggressivenessLabel,
+} from "./aggressiveness";
 
 export class HardStrategy implements AIStrategy {
   readonly difficulty = "hard" as const;
@@ -44,9 +51,40 @@ export class HardStrategy implements AIStrategy {
   private moonEvaluation: MoonEvaluation | null = null;
   private _currentPlayerIndex: number | undefined;
 
+  /** Base aggressiveness set at game start (0.3-0.7 range) */
+  private baseAggressiveness: number;
+  /** Current effective aggressiveness after score adjustment */
+  private currentAggressiveness: number = 0.5;
+  /** Current aggressiveness modifiers */
+  private aggressivenessModifiers: AggressivenessModifiers | null = null;
+
   constructor(config: Partial<AIConfig> = {}) {
     this.config = { ...DEFAULT_AI_CONFIG, ...config };
     this.memory = new CardMemory(this.config.memoryTrickCount);
+    // Generate random base aggressiveness for this AI's personality
+    this.baseAggressiveness = generateBaseAggressiveness();
+  }
+
+  /** Get the base aggressiveness (for testing/debugging) */
+  getBaseAggressiveness(): number {
+    return this.baseAggressiveness;
+  }
+
+  /** Get current effective aggressiveness (for testing/debugging) */
+  getCurrentAggressiveness(): number {
+    return this.currentAggressiveness;
+  }
+
+  /** Update aggressiveness based on current game state */
+  private updateAggressiveness(gameState: GameState, playerIndex: number): void {
+    this.currentAggressiveness = getEffectiveAggressiveness(
+      this.baseAggressiveness,
+      gameState,
+      playerIndex
+    );
+    this.aggressivenessModifiers = getAggressivenessModifiers(
+      this.currentAggressiveness
+    );
   }
 
   onRoundStart(): void {
@@ -104,8 +142,14 @@ export class HardStrategy implements AIStrategy {
     this.updatePlayerIndexMap(gameState);
     this._currentPlayerIndex = playerIndex;
 
-    // Evaluate moon potential
-    this.moonEvaluation = evaluateMoonPotential(hand);
+    // Update aggressiveness based on current score position
+    this.updateAggressiveness(gameState, playerIndex);
+
+    // Evaluate moon potential (with aggressiveness-adjusted threshold)
+    this.moonEvaluation = evaluateMoonPotential(
+      hand,
+      this.aggressivenessModifiers?.moonThresholdAdjustment ?? 0
+    );
     this.attemptingMoon = this.moonEvaluation.shouldAttempt;
 
     let scoredCards: ScoredCard[];
@@ -150,6 +194,10 @@ export class HardStrategy implements AIStrategy {
     this.updatePlayerIndexMap(gameState);
     this._currentPlayerIndex = playerIndex;
 
+    // Update aggressiveness based on current score position
+    this.updateAggressiveness(gameState, playerIndex);
+    const modifiers = this.aggressivenessModifiers!;
+
     // Must play 2♣ on first trick
     if (isFirstTrick) {
       const twoOfClubs = validCards.find(
@@ -188,7 +236,8 @@ export class HardStrategy implements AIStrategy {
         context,
         this.memory,
         moonShooterIndex,
-        this.attemptingMoon
+        this.attemptingMoon,
+        modifiers
       );
       contextInfo = this.attemptingMoon ? "Leading (MOON)" : "Leading";
     } else if (leadSuit) {
@@ -200,7 +249,8 @@ export class HardStrategy implements AIStrategy {
           this.memory,
           this.config,
           moonShooterIndex,
-          this.attemptingMoon
+          this.attemptingMoon,
+          modifiers
         );
         contextInfo = this.attemptingMoon
           ? `Following ${leadSuit} (MOON)`
@@ -212,7 +262,8 @@ export class HardStrategy implements AIStrategy {
           this.memory,
           this.config,
           moonShooterIndex,
-          this.attemptingMoon
+          this.attemptingMoon,
+          modifiers
         );
         contextInfo = this.attemptingMoon
           ? "Dumping (MOON)"
@@ -225,7 +276,8 @@ export class HardStrategy implements AIStrategy {
         this.memory,
         this.config,
         moonShooterIndex,
-        this.attemptingMoon
+        this.attemptingMoon,
+        modifiers
       );
       contextInfo = this.attemptingMoon ? "Dumping (MOON)" : "Dumping";
     }
@@ -260,6 +312,7 @@ export class HardStrategy implements AIStrategy {
     scoredCards: ScoredCard[],
     contextInfo: string
   ): void {
+    const aggressivenessLabel = getAggressivenessLabel(this.currentAggressiveness);
     useAIDebugStore.getState().addLog({
       playerId: gameState.players[playerIndex].id,
       playerName: gameState.players[playerIndex].name,
@@ -268,7 +321,7 @@ export class HardStrategy implements AIStrategy {
       roundNumber: gameState.roundNumber,
       decision: chosenCards,
       consideredCards: scoredCards,
-      contextInfo,
+      contextInfo: `${contextInfo} [${aggressivenessLabel} ${(this.currentAggressiveness * 100).toFixed(0)}%]`,
       aiVersion: AI_VERSION,
       memorySnapshot: this.attemptingMoon
         ? {
@@ -279,8 +332,16 @@ export class HardStrategy implements AIStrategy {
             attemptingMoon: true,
             moonConfidence: this.moonEvaluation?.confidence,
             moonReasons: this.moonEvaluation?.reasons,
+            aggressiveness: this.currentAggressiveness,
+            baseAggressiveness: this.baseAggressiveness,
           }
-        : undefined,
+        : {
+            cardsTracked: 0,
+            tricksCounted: 0,
+            voidPlayers: [],
+            aggressiveness: this.currentAggressiveness,
+            baseAggressiveness: this.baseAggressiveness,
+          },
     });
   }
 
@@ -295,6 +356,7 @@ export class HardStrategy implements AIStrategy {
     attemptingMoon = false
   ): void {
     const memorySnapshot = this.memory.getSnapshot();
+    const aggressivenessLabel = getAggressivenessLabel(this.currentAggressiveness);
     useAIDebugStore.getState().addLog({
       playerId: gameState.players[playerIndex].id,
       playerName: gameState.players[playerIndex].name,
@@ -304,7 +366,7 @@ export class HardStrategy implements AIStrategy {
       trickNumber,
       decision: chosenCard,
       consideredCards: scoredCards,
-      contextInfo,
+      contextInfo: `${contextInfo} [${aggressivenessLabel} ${(this.currentAggressiveness * 100).toFixed(0)}%]`,
       memorySnapshot: {
         ...memorySnapshot,
         moonShooterCandidate:
@@ -315,6 +377,8 @@ export class HardStrategy implements AIStrategy {
         moonConfidence: attemptingMoon
           ? this.moonEvaluation?.confidence
           : undefined,
+        aggressiveness: this.currentAggressiveness,
+        baseAggressiveness: this.baseAggressiveness,
       },
       aiVersion: AI_VERSION,
     });
