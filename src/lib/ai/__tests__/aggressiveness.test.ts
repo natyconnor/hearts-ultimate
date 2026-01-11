@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   generateBaseAggressiveness,
   calculateScoreAdjustment,
@@ -186,7 +186,7 @@ describe("getAggressivenessModifiers", () => {
     expect(modifiers.highCardDumpBonus).toBeCloseTo(25);
 
     // Bluff probability: 0.08 + 1.0 * 0.22 = 0.30 (30%)
-    expect(modifiers.bluffProbability).toBeCloseTo(0.30);
+    expect(modifiers.bluffProbability).toBeCloseTo(0.3);
 
     // Leader threshold: 25 - 1.0 * 15 = 10 (target leaders earlier)
     expect(modifiers.leaderTargetThreshold).toBeCloseTo(10);
