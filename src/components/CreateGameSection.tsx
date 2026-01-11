@@ -110,6 +110,7 @@ export function CreateGameSection({
         >
           {/* Button glow effect */}
           <motion.div
+            initial={{ opacity: 0 }}
             animate={{ opacity: isHovered ? 0.5 : 0 }}
             className="absolute inset-0 rounded-2xl bg-emerald-400/20 blur-xl"
           />

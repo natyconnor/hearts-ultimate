@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "../../test/testUtils";
 import { GameSettings } from "../GameSettings";
+import { STORAGE_KEYS } from "../../lib/constants";
 
 // Mock the sound module
 vi.mock("../../lib/sounds", () => ({
@@ -13,12 +14,20 @@ vi.mock("../../lib/sounds", () => ({
   playSound: vi.fn(),
 }));
 
-// Mock localStorage
+// Mock localStorage with a store to track values
+let mockStore: Record<string, string> = {};
+
 const localStorageMock = {
-  getItem: vi.fn(),
-  setItem: vi.fn(),
-  clear: vi.fn(),
-  removeItem: vi.fn(),
+  getItem: vi.fn((key: string) => mockStore[key] ?? null),
+  setItem: vi.fn((key: string, value: string) => {
+    mockStore[key] = value;
+  }),
+  clear: vi.fn(() => {
+    mockStore = {};
+  }),
+  removeItem: vi.fn((key: string) => {
+    delete mockStore[key];
+  }),
   length: 0,
   key: vi.fn(),
 };
@@ -30,6 +39,7 @@ Object.defineProperty(window, "localStorage", {
 describe("GameSettings Component", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockStore = {}; // Reset store between tests
   });
 
   describe("Settings Button", () => {
@@ -135,6 +145,211 @@ describe("GameSettings Component", () => {
       expect(
         screen.getByText("Adjust how quickly AI players make their moves")
       ).toBeInTheDocument();
+    });
+
+    it("slider has correct min/max/step values", () => {
+      render(<GameSettings />);
+
+      fireEvent.click(screen.getByLabelText("Game settings"));
+
+      const slider = screen.getByLabelText("AI Play Speed");
+      expect(slider).toHaveAttribute("min", "0");
+      expect(slider).toHaveAttribute("max", "1");
+      expect(slider).toHaveAttribute("step", "0.05");
+    });
+
+    it("uses default speed (0.5) when no stored value", () => {
+      render(<GameSettings />);
+
+      fireEvent.click(screen.getByLabelText("Game settings"));
+
+      const slider = screen.getByLabelText("AI Play Speed") as HTMLInputElement;
+      expect(slider.value).toBe("0.5");
+    });
+
+    it("loads stored speed from localStorage", () => {
+      mockStore[STORAGE_KEYS.AI_PLAY_SPEED] = "0.8";
+
+      render(<GameSettings />);
+
+      fireEvent.click(screen.getByLabelText("Game settings"));
+
+      const slider = screen.getByLabelText("AI Play Speed") as HTMLInputElement;
+      expect(slider.value).toBe("0.8");
+    });
+
+    it("uses default when stored value is invalid", () => {
+      mockStore[STORAGE_KEYS.AI_PLAY_SPEED] = "invalid";
+
+      render(<GameSettings />);
+
+      fireEvent.click(screen.getByLabelText("Game settings"));
+
+      const slider = screen.getByLabelText("AI Play Speed") as HTMLInputElement;
+      expect(slider.value).toBe("0.5");
+    });
+
+    it("uses default when stored value is out of range (negative)", () => {
+      mockStore[STORAGE_KEYS.AI_PLAY_SPEED] = "-0.5";
+
+      render(<GameSettings />);
+
+      fireEvent.click(screen.getByLabelText("Game settings"));
+
+      const slider = screen.getByLabelText("AI Play Speed") as HTMLInputElement;
+      expect(slider.value).toBe("0.5");
+    });
+
+    it("uses default when stored value is out of range (>1)", () => {
+      mockStore[STORAGE_KEYS.AI_PLAY_SPEED] = "1.5";
+
+      render(<GameSettings />);
+
+      fireEvent.click(screen.getByLabelText("Game settings"));
+
+      const slider = screen.getByLabelText("AI Play Speed") as HTMLInputElement;
+      expect(slider.value).toBe("0.5");
+    });
+  });
+
+  describe("AI Speed Persistence", () => {
+    it("saves speed to localStorage when changed", () => {
+      render(<GameSettings />);
+
+      fireEvent.click(screen.getByLabelText("Game settings"));
+
+      const slider = screen.getByLabelText("AI Play Speed");
+      fireEvent.change(slider, { target: { value: "0.75" } });
+
+      expect(localStorage.setItem).toHaveBeenCalledWith(
+        STORAGE_KEYS.AI_PLAY_SPEED,
+        "0.75"
+      );
+    });
+
+    it("updates localStorage on every change", () => {
+      render(<GameSettings />);
+
+      fireEvent.click(screen.getByLabelText("Game settings"));
+
+      const slider = screen.getByLabelText("AI Play Speed");
+
+      fireEvent.change(slider, { target: { value: "0.2" } });
+      expect(localStorage.setItem).toHaveBeenLastCalledWith(
+        STORAGE_KEYS.AI_PLAY_SPEED,
+        "0.2"
+      );
+
+      fireEvent.change(slider, { target: { value: "0.9" } });
+      expect(localStorage.setItem).toHaveBeenLastCalledWith(
+        STORAGE_KEYS.AI_PLAY_SPEED,
+        "0.9"
+      );
+    });
+
+    it("persists speed when moving to minimum (slow)", () => {
+      render(<GameSettings />);
+
+      fireEvent.click(screen.getByLabelText("Game settings"));
+
+      const slider = screen.getByLabelText("AI Play Speed");
+      fireEvent.change(slider, { target: { value: "0" } });
+
+      expect(localStorage.setItem).toHaveBeenCalledWith(
+        STORAGE_KEYS.AI_PLAY_SPEED,
+        "0"
+      );
+    });
+
+    it("persists speed when moving to maximum (fast)", () => {
+      render(<GameSettings />);
+
+      fireEvent.click(screen.getByLabelText("Game settings"));
+
+      const slider = screen.getByLabelText("AI Play Speed");
+      fireEvent.change(slider, { target: { value: "1" } });
+
+      expect(localStorage.setItem).toHaveBeenCalledWith(
+        STORAGE_KEYS.AI_PLAY_SPEED,
+        "1"
+      );
+    });
+  });
+
+  describe("AI Speed Emoji Display", () => {
+    it("shows sloth emoji (🦥) for Very Slow speed", () => {
+      mockStore[STORAGE_KEYS.AI_PLAY_SPEED] = "0.1";
+
+      render(<GameSettings />);
+      fireEvent.click(screen.getByLabelText("Game settings"));
+
+      expect(screen.getByText("🦥")).toBeInTheDocument();
+      expect(screen.getByText("Very Slow")).toBeInTheDocument();
+    });
+
+    it("shows turtle emoji (🐢) for Slow speed (0.3)", () => {
+      mockStore[STORAGE_KEYS.AI_PLAY_SPEED] = "0.3";
+
+      render(<GameSettings />);
+      fireEvent.click(screen.getByLabelText("Game settings"));
+
+      expect(screen.getByText("🐢")).toBeInTheDocument();
+      // "Slow" appears twice - as label and as slider end label
+      // Check that the speed label container has the right text
+      const speedLabels = screen.getAllByText("Slow");
+      expect(speedLabels.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("shows walking emoji (🚶) for Normal speed", () => {
+      mockStore[STORAGE_KEYS.AI_PLAY_SPEED] = "0.5";
+
+      render(<GameSettings />);
+      fireEvent.click(screen.getByLabelText("Game settings"));
+
+      expect(screen.getByText("🚶")).toBeInTheDocument();
+      expect(screen.getByText("Normal")).toBeInTheDocument();
+    });
+
+    it("shows running emoji (🏃) for Fast speed (0.7)", () => {
+      mockStore[STORAGE_KEYS.AI_PLAY_SPEED] = "0.7";
+
+      render(<GameSettings />);
+      fireEvent.click(screen.getByLabelText("Game settings"));
+
+      expect(screen.getByText("🏃")).toBeInTheDocument();
+      // "Fast" appears twice - as label and as slider end label
+      const fastLabels = screen.getAllByText("Fast");
+      expect(fastLabels.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("shows lightning emoji (⚡) for Very Fast speed", () => {
+      mockStore[STORAGE_KEYS.AI_PLAY_SPEED] = "0.9";
+
+      render(<GameSettings />);
+      fireEvent.click(screen.getByLabelText("Game settings"));
+
+      // Note: ⚡ appears in the header icon too, so use getAllByText
+      const lightningEmojis = screen.getAllByText("⚡");
+      expect(lightningEmojis.length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText("Very Fast")).toBeInTheDocument();
+    });
+
+    it("updates emoji when slider changes", () => {
+      render(<GameSettings />);
+      fireEvent.click(screen.getByLabelText("Game settings"));
+
+      const slider = screen.getByLabelText("AI Play Speed");
+
+      // Start at default (Normal)
+      expect(screen.getByText("🚶")).toBeInTheDocument();
+
+      // Change to very fast
+      fireEvent.change(slider, { target: { value: "0.9" } });
+      expect(screen.getByText("Very Fast")).toBeInTheDocument();
+
+      // Change to very slow
+      fireEvent.change(slider, { target: { value: "0.1" } });
+      expect(screen.getByText("🦥")).toBeInTheDocument();
     });
   });
 

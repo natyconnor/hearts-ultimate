@@ -312,12 +312,8 @@ export function useLobbyMutations({
 interface AnimationCallbacks {
   setShowCompletedTrick: (show: boolean) => void;
   setAnimatingToWinner: (animating: boolean) => void;
-  setShowRoundSummary: (show: boolean) => void;
-  setShowGameEnd: (show: boolean) => void;
   setSelectedCard: (card: Card | null) => void;
   isAnimatingRef: React.MutableRefObject<boolean>;
-  showRoundSummaryRef: React.MutableRefObject<boolean>;
-  showGameEndRef: React.MutableRefObject<boolean>;
 }
 
 interface UseGameplayMutationsParams {
@@ -347,12 +343,8 @@ export function useGameplayMutations({
   const {
     setShowCompletedTrick,
     setAnimatingToWinner,
-    setShowRoundSummary,
-    setShowGameEnd,
     setSelectedCard,
     isAnimatingRef,
-    showRoundSummaryRef,
-    showGameEndRef,
   } = animationCallbacks;
 
   const playCard = useMutation({
@@ -420,18 +412,9 @@ export function useGameplayMutations({
           completedTrickNumber
         );
 
-        if (isTestMode) {
-          if (
-            updatedGameState.isGameOver &&
-            updatedGameState.winnerIndex !== undefined
-          ) {
-            setShowGameEnd(true);
-            showGameEndRef.current = true;
-          } else if (updatedGameState.isRoundComplete) {
-            setShowRoundSummary(true);
-            showRoundSummaryRef.current = true;
-          }
-        } else {
+        // In test mode, overlays show immediately via derived state
+        // In normal mode, animate the trick completion first
+        if (!isTestMode) {
           setTimeout(() => playSound("trickWin"), 400);
 
           setShowCompletedTrick(true);
@@ -446,13 +429,12 @@ export function useGameplayMutations({
               setAnimatingToWinner(false);
               isAnimatingRef.current = false;
 
+              // Play sounds when overlays will appear (they're derived from game state)
               if (
                 updatedGameState.isGameOver &&
                 updatedGameState.winnerIndex !== undefined
               ) {
                 playSound("gameEnd");
-                setShowGameEnd(true);
-                showGameEndRef.current = true;
               } else if (updatedGameState.isRoundComplete) {
                 const moonCheck = checkShootingTheMoon(
                   updatedGameState.roundScores
@@ -460,8 +442,6 @@ export function useGameplayMutations({
                 if (moonCheck.shot) {
                   playSound("shootTheMoon");
                 }
-                setShowRoundSummary(true);
-                showRoundSummaryRef.current = true;
               }
             }, 1000);
           }, 600);
@@ -492,8 +472,7 @@ export function useGameplayMutations({
       return updatedGameState;
     },
     onSuccess: (updatedGameState) => {
-      setShowRoundSummary(false);
-      showRoundSummaryRef.current = false;
+      // Overlays hide automatically via derived state when game state updates
       setSelectedCardsToPass([]);
       updateGameState(updatedGameState);
       queryClient.invalidateQueries({ queryKey: ["room", slug] });
@@ -572,8 +551,7 @@ export function useGameplayMutations({
       return updatedGameState;
     },
     onSuccess: (updatedGameState) => {
-      setShowGameEnd(false);
-      showGameEndRef.current = false;
+      // Overlays hide automatically via derived state when game state updates
       setSelectedCardsToPass([]);
       useAIDebugStore.getState().clearLogs();
       updateGameState(updatedGameState);

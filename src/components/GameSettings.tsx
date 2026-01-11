@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Settings, X, Volume2, VolumeX, Zap } from "lucide-react";
 import { cn } from "../lib/utils";
 import { soundManager } from "../lib/sounds";
 import { playSound } from "../lib/sounds";
-import { STORAGE_KEYS, AI_SPEED_RANGE } from "../lib/constants";
+import { STORAGE_KEYS } from "../lib/constants";
+import { getStoredAISpeed } from "../lib/settings";
 
 export function GameSettings() {
   const [isOpen, setIsOpen] = useState(false);
@@ -15,33 +16,19 @@ export function GameSettings() {
   const [volume, setVolume] = useState(() => {
     return soundManager.getVolume();
   });
-  const [aiSpeed, setAISpeed] = useState(() => {
-    const stored = localStorage.getItem(STORAGE_KEYS.AI_PLAY_SPEED);
-    return stored !== null ? parseFloat(stored) : AI_SPEED_RANGE.DEFAULT_SPEED;
-  });
-
-  // Sync sound manager when settings change
-  useEffect(() => {
-    soundManager.setEnabled(soundEnabled);
-    localStorage.setItem(STORAGE_KEYS.SOUND_ENABLED, String(soundEnabled));
-  }, [soundEnabled]);
-
-  useEffect(() => {
-    soundManager.setVolume(volume);
-    localStorage.setItem(STORAGE_KEYS.SOUND_VOLUME, String(volume));
-  }, [volume]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.AI_PLAY_SPEED, String(aiSpeed));
-  }, [aiSpeed]);
+  const [aiSpeed, setAISpeed] = useState(() => getStoredAISpeed());
 
   const handleVolumeChange = (newVolume: number) => {
     setVolume(newVolume);
+    soundManager.setVolume(newVolume);
+    localStorage.setItem(STORAGE_KEYS.SOUND_VOLUME, String(newVolume));
   };
 
   const handleToggleSound = () => {
     const newEnabled = !soundEnabled;
     setSoundEnabled(newEnabled);
+    soundManager.setEnabled(newEnabled);
+    localStorage.setItem(STORAGE_KEYS.SOUND_ENABLED, String(newEnabled));
     if (newEnabled) {
       playSound("buttonClick");
     }
@@ -49,13 +36,12 @@ export function GameSettings() {
 
   const handleAISpeedChange = (newSpeed: number) => {
     setAISpeed(newSpeed);
+    localStorage.setItem(STORAGE_KEYS.AI_PLAY_SPEED, String(newSpeed));
   };
 
   // Get display text and emoji for AI speed
   // Note: speed 0 = slow, speed 1 = fast (slider goes left to right)
-  const getSpeedInfo = (
-    speed: number
-  ): { label: string; emoji: string } => {
+  const getSpeedInfo = (speed: number): { label: string; emoji: string } => {
     if (speed >= 0.8) return { label: "Very Fast", emoji: "⚡" };
     if (speed >= 0.6) return { label: "Fast", emoji: "🏃" };
     if (speed >= 0.4) return { label: "Normal", emoji: "🚶" };
@@ -196,7 +182,11 @@ export function GameSettings() {
                       animate={{
                         x: soundEnabled ? 24 : 2,
                       }}
-                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 500,
+                        damping: 30,
+                      }}
                     >
                       {soundEnabled ? (
                         <Volume2 className="w-3 h-3 text-emerald-500" />

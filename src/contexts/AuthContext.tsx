@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, useCallback, type ReactNode } from "react";
 import { supabase } from "../supabaseClient";
 import type { User } from "@supabase/supabase-js";
 import { AuthContext, type UserStats } from "./authContextDef";
@@ -11,14 +11,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState<UserStats | null>(null);
 
-  // Fetch user stats
-  const refreshStats = async () => {
-    if (!user) return;
-
+  // Fetch stats for a given user ID
+  const fetchStatsForUser = async (userId: string) => {
     const { data } = await supabase
       .from("user_stats")
       .select("games_played, games_won, total_points_taken, moons_shot")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .single();
 
     if (data) {
@@ -26,17 +24,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Public method to refresh stats on demand
+  const refreshStats = useCallback(async () => {
+    if (!user) return;
+    await fetchStatsForUser(user.id);
+  }, [user]);
+
   useEffect(() => {
+    // Helper to set user and fetch their stats
+    const setUserAndFetchStats = (newUser: User | null) => {
+      setUser(newUser);
+      if (newUser) {
+        fetchStatsForUser(newUser.id);
+      } else {
+        setStats(null);
+      }
+    };
+
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        setUser(session.user);
+        setUserAndFetchStats(session.user);
         setIsLoading(false);
       } else {
         // Silently sign in anonymously - user doesn't see anything
         supabase.auth.signInAnonymously().then(({ data, error }) => {
           if (!error && data.user) {
-            setUser(data.user);
+            setUserAndFetchStats(data.user);
           }
           setIsLoading(false);
         });
@@ -47,21 +61,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      setUserAndFetchStats(session?.user ?? null);
     });
 
     return () => subscription.unsubscribe();
   }, []);
-
-  // Fetch stats when user changes
-  useEffect(() => {
-    if (user) {
-      refreshStats();
-    } else {
-      setStats(null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
 
   const isAnonymous = user?.is_anonymous ?? true;
 

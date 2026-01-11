@@ -41,12 +41,10 @@ export function NameInputModal({
     }
   }, [isOpen]);
 
-  // Reset state when modal closes
-  useEffect(() => {
-    if (!isOpen) {
-      setName("");
-    }
-  }, [isOpen]);
+  const handleClose = () => {
+    setName("");
+    onClose();
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,7 +56,7 @@ export function NameInputModal({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
-      onClose();
+      handleClose();
     }
   };
 
@@ -73,7 +71,7 @@ export function NameInputModal({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose}
+            onClick={handleClose}
             className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm"
           />
 
@@ -105,7 +103,7 @@ export function NameInputModal({
 
               {/* Close button */}
               <button
-                onClick={onClose}
+                onClick={handleClose}
                 className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors p-1 hover:bg-white/10 rounded-lg"
               >
                 <X className="w-5 h-5" />
@@ -171,12 +169,9 @@ export function NameInputModal({
                   <div className="flex gap-3 pt-2">
                     <button
                       type="button"
-                      onClick={onClose}
+                      onClick={handleClose}
                       disabled={isLoading}
-                      className={cn(
-                        buttonClasses("secondary"),
-                        "flex-1"
-                      )}
+                      className={cn(buttonClasses("secondary"), "flex-1")}
                     >
                       Cancel
                     </button>

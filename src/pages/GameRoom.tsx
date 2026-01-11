@@ -14,11 +14,8 @@ import {
   useSpectatorMutations,
 } from "../hooks/useGameMutations";
 import { useGameStore } from "../store/gameStore";
-import {
-  STORAGE_KEYS,
-  AI_SPEED_RANGE,
-  getAIDelayFromSpeed,
-} from "../lib/constants";
+import { STORAGE_KEYS, getAIDelayFromSpeed } from "../lib/constants";
+import { getStoredAISpeed } from "../lib/settings";
 import { chooseAICard } from "../lib/ai";
 import { hasPlayerSubmittedPass } from "../game/passingLogic";
 import { cardsEqual } from "../game/cardDisplay";
@@ -59,21 +56,16 @@ export function GameRoom() {
   const [selectedCard, setSelectedCard] = useState<CardType | null>(null);
   const [showCompletedTrick, setShowCompletedTrick] = useState(false);
   const [animatingToWinner, setAnimatingToWinner] = useState(false);
-  const [showRoundSummary, setShowRoundSummary] = useState(false);
-  const [showGameEnd, setShowGameEnd] = useState(false);
   const [selectedCardsToPass, setSelectedCardsToPass] = useState<CardType[]>(
     []
   );
-  const [showAutoSpectatorModal, setShowAutoSpectatorModal] = useState(false);
+  // Track if user has dismissed the auto-spectator prompt
+  const [dismissedSpectatorPrompt, setDismissedSpectatorPrompt] =
+    useState(false);
   const [showLeaveConfirmModal, setShowLeaveConfirmModal] = useState(false);
   const cardHandRef = useRef<HTMLDivElement>(null);
-  // Use refs for animation state to avoid closure issues in useEffect
+  // Use ref for animation state to avoid closure issues in useEffect
   const isAnimatingRef = useRef(false);
-  const showRoundSummaryRef = useRef(false);
-  const showGameEndRef = useRef(false);
-  // Track what round/game state we've already shown overlays for (to handle realtime updates)
-  const lastProcessedRoundRef = useRef<number | null>(null);
-  const lastProcessedGameOverRef = useRef<boolean>(false);
 
   const { isConnected, error: realtimeError } = useGameRealtime(slug ?? null);
 
@@ -98,6 +90,14 @@ export function GameRoom() {
     [currentGameState?.players]
   );
   const roomStatus = currentRoom.status ?? room?.status ?? "waiting";
+
+  // Derive overlay visibility directly from game state (no effects needed)
+  // When nextRound/newGame mutations complete, game state changes and overlays hide automatically
+  const showRoundSummary =
+    !!currentGameState?.isRoundComplete && !currentGameState?.isGameOver;
+  const showGameEnd =
+    !!currentGameState?.isGameOver &&
+    currentGameState?.winnerIndex !== undefined;
 
   // Test mode: enabled via URL param or if all players are AI
   const isTestMode =
@@ -129,12 +129,8 @@ export function GameRoom() {
     animationCallbacks: {
       setShowCompletedTrick,
       setAnimatingToWinner,
-      setShowRoundSummary,
-      setShowGameEnd,
       setSelectedCard,
       isAnimatingRef,
-      showRoundSummaryRef,
-      showGameEndRef,
     },
   });
 
@@ -164,6 +160,15 @@ export function GameRoom() {
     ? spectators.find((s) => s.id === currentSpectatorId) ?? null
     : null;
 
+  // Auto-spectate: derived state for when to show the prompt
+  const showAutoSpectatorModal =
+    !!room &&
+    roomStatus === "playing" &&
+    !isPlayerInRoom &&
+    !isSpectating &&
+    !spectatorMutations.joinSpectator.isPending &&
+    !dismissedSpectatorPrompt;
+
   useRoomNavigationBlocker({
     slug: slug ?? null,
     isPlayerInRoom,
@@ -185,84 +190,15 @@ export function GameRoom() {
     showGameEnd,
   });
 
-  // Auto-spectate: When visiting a room that's already playing and not a player,
-  // show modal to join as spectator
-  useEffect(() => {
-    if (
-      room &&
-      roomStatus === "playing" &&
-      !isPlayerInRoom &&
-      !isSpectating &&
-      !spectatorMutations.joinSpectator.isPending &&
-      !showAutoSpectatorModal
-    ) {
-      // User arrived at a game in progress without being a player
-      setShowAutoSpectatorModal(true);
-    }
-  }, [
-    room,
-    roomStatus,
-    isPlayerInRoom,
-    isSpectating,
-    spectatorMutations.joinSpectator.isPending,
-    showAutoSpectatorModal,
-  ]);
-
   const handleAutoSpectatorSubmit = (name: string) => {
     spectatorMutations.joinSpectator.mutate(name, {
-      onSuccess: () => setShowAutoSpectatorModal(false),
+      onSuccess: () => setDismissedSpectatorPrompt(true),
     });
   };
 
-  // Watch for round/game completion via realtime updates (for players who didn't play the last card)
-  // This ensures all players see the round summary and game end overlays
-  useEffect(() => {
-    if (!currentGameState || isAnimatingRef.current) return;
-
-    const roundNumber = currentGameState.roundNumber;
-    const isGameOver = currentGameState.isGameOver ?? false;
-    const isRoundComplete = currentGameState.isRoundComplete ?? false;
-
-    // Reset tracking refs when a new game starts (round 1, not complete, not game over)
-    if (roundNumber === 1 && !isRoundComplete && !isGameOver) {
-      lastProcessedRoundRef.current = null;
-      lastProcessedGameOverRef.current = false;
-    }
-
-    // Show game end overlay when game is over (and we haven't shown it yet)
-    if (
-      isGameOver &&
-      currentGameState.winnerIndex !== undefined &&
-      !lastProcessedGameOverRef.current
-    ) {
-      lastProcessedGameOverRef.current = true;
-      // Schedule state update to avoid synchronous cascading renders
-      queueMicrotask(() => {
-        setShowGameEnd(true);
-        showGameEndRef.current = true;
-      });
-    }
-    // Show round summary when round is complete (but not game over)
-    // Only show if we haven't already processed this round
-    else if (
-      isRoundComplete &&
-      !isGameOver &&
-      lastProcessedRoundRef.current !== roundNumber
-    ) {
-      lastProcessedRoundRef.current = roundNumber;
-      // Schedule state update to avoid synchronous cascading renders
-      queueMicrotask(() => {
-        setShowRoundSummary(true);
-        showRoundSummaryRef.current = true;
-      });
-    }
-  }, [
-    currentGameState?.isRoundComplete,
-    currentGameState?.isGameOver,
-    currentGameState?.winnerIndex,
-    currentGameState?.roundNumber,
-    currentGameState,
-  ]);
+  const handleDismissAutoSpectator = () => {
+    setDismissedSpectatorPrompt(true);
+  };
 
   // Auto-advance round summary in test mode
   useEffect(() => {
@@ -352,8 +288,8 @@ export function GameRoom() {
       !currentGameState ||
       gameplayMutations.playCard.isPending ||
       isAnimatingRef.current ||
-      showRoundSummaryRef.current ||
-      showGameEndRef.current
+      showRoundSummary ||
+      showGameEnd
     ) {
       return;
     }
@@ -375,12 +311,7 @@ export function GameRoom() {
 
     // In test mode, skip delays for fast playthrough
     // Otherwise, use the user's configured AI play speed
-    const storedSpeed = localStorage.getItem(STORAGE_KEYS.AI_PLAY_SPEED);
-    const aiSpeed =
-      storedSpeed !== null
-        ? parseFloat(storedSpeed)
-        : AI_SPEED_RANGE.DEFAULT_SPEED;
-    const delay = isTestMode ? 50 : getAIDelayFromSpeed(aiSpeed);
+    const delay = isTestMode ? 50 : getAIDelayFromSpeed(getStoredAISpeed());
 
     const timeoutId = setTimeout(() => {
       // Double-check conditions haven't changed
@@ -389,11 +320,7 @@ export function GameRoom() {
         !latestState ||
         latestState.currentPlayerIndex !== currentPlayerIndex ||
         latestState.players[currentPlayerIndex]?.id !== currentPlayer.id ||
-        gameplayMutations.playCard.isPending ||
-        (!isTestMode &&
-          (isAnimatingRef.current ||
-            showRoundSummaryRef.current ||
-            showGameEndRef.current))
+        gameplayMutations.playCard.isPending
       ) {
         return;
       }
@@ -631,7 +558,7 @@ export function GameRoom() {
         {/* Auto-Spectator Modal - shown when arriving at an in-progress game */}
         <NameInputModal
           isOpen={showAutoSpectatorModal}
-          onClose={() => setShowAutoSpectatorModal(false)}
+          onClose={handleDismissAutoSpectator}
           onSubmit={handleAutoSpectatorSubmit}
           title="Game in Progress"
           subtitle="This game has already started. Enter your name to watch as a spectator."
