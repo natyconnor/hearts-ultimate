@@ -329,16 +329,13 @@ export class MediumStrategy implements AIStrategy {
       const wouldWin = card.rank > currentHighest;
 
       // CRITICAL: Check if playing this card would give us penalty points
-      // Use the card's built-in point value
+      // Use the card's built-in point value - penalty scales with points
       if (wouldWin && card.points > 0 && !context.isFirstTrick) {
         // Playing a penalty card and winning = we take those points!
         score +=
           FOLLOW_SCORES.WIN_WITH_POINTS_BASE +
           card.points * FOLLOW_SCORES.PENALTY_POINTS_MULTIPLIER;
         reasons.push(`Would win with ${card.points} pts!`);
-        if (card.points >= 13) {
-          return { card, score, reasons }; // Q♠ is catastrophic, exit early
-        }
       }
 
       // High spades (K♠, A♠) are dangerous when Q♠ is still out
@@ -404,14 +401,16 @@ export class MediumStrategy implements AIStrategy {
       let score = DUMP_SCORES.BASE;
       const reasons: string[] = [];
 
-      // Penalty cards - dump based on their point value
+      // Penalty cards - dump based on their point value AND rank
       if (card.points > 0) {
         // Higher points = more urgent to dump
-        // Q♠ (13 pts) gets ~200+, hearts (1 pt) get ~53+
+        // Q♠ (13 pts) gets high priority
+        // For hearts (all 1 pt), also factor in rank - high hearts are more dangerous
         score +=
           DUMP_SCORES.HEART_BASE +
-          card.points * DUMP_SCORES.HEART_RANK_MULTIPLIER;
-        reasons.push(`Dump ${card.points} pt card`);
+          card.points * DUMP_SCORES.HEART_RANK_MULTIPLIER +
+          card.rank * DUMP_SCORES.HEART_RANK_MULTIPLIER; // Prefer dumping high hearts
+        reasons.push(`Dump ${card.points} pt card (rank ${card.rank})`);
       }
 
       // Other high cards (non-penalty)
