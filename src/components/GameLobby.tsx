@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, Copy, Check, Eye, Home } from "lucide-react";
 import { GameSettings } from "./GameSettings";
+import { NameInputModal } from "./NameInputModal";
+import { ConfirmModal } from "./ConfirmModal";
 import { cn } from "../lib/utils";
 import { getDifficultyDisplayName } from "../lib/aiPlayers";
 import type { Player, AIDifficulty, Spectator } from "../types/game";
@@ -82,6 +84,14 @@ export function GameLobby({
   );
   const [copied, setCopied] = useState(false);
 
+  // Modal states
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [showSpectatorModal, setShowSpectatorModal] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [showLeaveSpectatorModal, setShowLeaveSpectatorModal] = useState(false);
+  const [showAddAIModal, setShowAddAIModal] = useState(false);
+  const [showStartGameModal, setShowStartGameModal] = useState(false);
+
   const currentPlayer = currentPlayerId
     ? players.find((p) => p.id === currentPlayerId) ?? null
     : null;
@@ -122,52 +132,63 @@ export function GameLobby({
   }, [openDifficultyMenu]);
 
   const handleJoin = () => {
-    const playerName = prompt("Enter your name:");
-    if (playerName && playerName.trim()) {
-      lobbyMutations.joinRoom.mutate(playerName.trim());
-    }
+    setShowJoinModal(true);
+  };
+
+  const handleJoinSubmit = (name: string) => {
+    lobbyMutations.joinRoom.mutate(name, {
+      onSuccess: () => setShowJoinModal(false),
+    });
   };
 
   const handleWatchAsSpectator = () => {
-    const spectatorName = prompt("Enter your name to watch:");
-    if (spectatorName && spectatorName.trim()) {
-      spectatorMutations.joinSpectator.mutate(spectatorName.trim());
-    }
+    setShowSpectatorModal(true);
+  };
+
+  const handleSpectatorSubmit = (name: string) => {
+    spectatorMutations.joinSpectator.mutate(name, {
+      onSuccess: () => setShowSpectatorModal(false),
+    });
   };
 
   const handleLeaveSpectator = () => {
-    if (window.confirm("Are you sure you want to stop watching?")) {
-      spectatorMutations.leaveSpectator.mutate();
-    }
+    setShowLeaveSpectatorModal(true);
+  };
+
+  const handleConfirmLeaveSpectator = () => {
+    spectatorMutations.leaveSpectator.mutate(undefined, {
+      onSuccess: () => setShowLeaveSpectatorModal(false),
+    });
   };
 
   const handleAddAIPlayers = () => {
-    const slotsToFill = 4 - players.length;
-    if (
-      window.confirm(
-        `Add ${slotsToFill} AI player${
-          slotsToFill > 1 ? "s" : ""
-        } to fill empty slots?`
-      )
-    ) {
-      lobbyMutations.addAIPlayers.mutate();
-    }
+    setShowAddAIModal(true);
+  };
+
+  const handleConfirmAddAI = () => {
+    lobbyMutations.addAIPlayers.mutate(undefined, {
+      onSuccess: () => setShowAddAIModal(false),
+    });
   };
 
   const handleStartGame = () => {
-    if (
-      window.confirm(
-        "Are you sure you want to start the game? All 4 players must be ready."
-      )
-    ) {
-      lobbyMutations.startGame.mutate();
-    }
+    setShowStartGameModal(true);
+  };
+
+  const handleConfirmStartGame = () => {
+    lobbyMutations.startGame.mutate(undefined, {
+      onSuccess: () => setShowStartGameModal(false),
+    });
   };
 
   const handleLeave = () => {
-    if (window.confirm("Are you sure you want to leave this room?")) {
-      lobbyMutations.leaveRoom.mutate();
-    }
+    setShowLeaveModal(true);
+  };
+
+  const handleConfirmLeave = () => {
+    lobbyMutations.leaveRoom.mutate(undefined, {
+      onSuccess: () => setShowLeaveModal(false),
+    });
   };
 
   const handleCopySlug = async () => {
@@ -562,6 +583,79 @@ export function GameLobby({
           </div>
         )}
       </div>
+
+      {/* Modals */}
+      <NameInputModal
+        isOpen={showJoinModal}
+        onClose={() => setShowJoinModal(false)}
+        onSubmit={handleJoinSubmit}
+        title="Join the Game"
+        subtitle="Enter your name to join as a player"
+        placeholder="Your name"
+        submitLabel="Join Game"
+        isLoading={lobbyMutations.joinRoom.isPending}
+        variant="player"
+      />
+
+      <NameInputModal
+        isOpen={showSpectatorModal}
+        onClose={() => setShowSpectatorModal(false)}
+        onSubmit={handleSpectatorSubmit}
+        title="Watch the Game"
+        subtitle="Enter your name to watch as a spectator"
+        placeholder="Your name"
+        submitLabel="Start Watching"
+        isLoading={spectatorMutations.joinSpectator.isPending}
+        variant="spectator"
+      />
+
+      <ConfirmModal
+        isOpen={showLeaveModal}
+        onClose={() => setShowLeaveModal(false)}
+        onConfirm={handleConfirmLeave}
+        title="Leave Room?"
+        message="Are you sure you want to leave this room? You can rejoin later if there's space."
+        confirmLabel="Leave"
+        isLoading={lobbyMutations.leaveRoom.isPending}
+        variant="danger"
+        icon="leave"
+      />
+
+      <ConfirmModal
+        isOpen={showLeaveSpectatorModal}
+        onClose={() => setShowLeaveSpectatorModal(false)}
+        onConfirm={handleConfirmLeaveSpectator}
+        title="Stop Watching?"
+        message="Are you sure you want to stop watching this game?"
+        confirmLabel="Stop Watching"
+        isLoading={spectatorMutations.leaveSpectator.isPending}
+        variant="warning"
+        icon="spectator"
+      />
+
+      <ConfirmModal
+        isOpen={showAddAIModal}
+        onClose={() => setShowAddAIModal(false)}
+        onConfirm={handleConfirmAddAI}
+        title="Add AI Players?"
+        message={`Add ${4 - players.length} AI player${4 - players.length > 1 ? "s" : ""} to fill the empty slots and start the game.`}
+        confirmLabel="Add AI"
+        isLoading={lobbyMutations.addAIPlayers.isPending}
+        variant="info"
+        icon="ai"
+      />
+
+      <ConfirmModal
+        isOpen={showStartGameModal}
+        onClose={() => setShowStartGameModal(false)}
+        onConfirm={handleConfirmStartGame}
+        title="Start Game?"
+        message="All 4 players are ready. Start the game now?"
+        confirmLabel="Start Game"
+        isLoading={lobbyMutations.startGame.isPending}
+        variant="success"
+        icon="start"
+      />
     </div>
   );
 }

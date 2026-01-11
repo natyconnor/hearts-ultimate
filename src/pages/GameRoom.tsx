@@ -31,6 +31,8 @@ import { AIDebugOverlay } from "../components/AIDebugOverlay";
 import { GameLobby } from "../components/GameLobby";
 import { GameHeader } from "../components/GameHeader";
 import { SpectatorControls } from "../components/SpectatorControls";
+import { NameInputModal } from "../components/NameInputModal";
+import { ConfirmModal } from "../components/ConfirmModal";
 import type { Card as CardType } from "../types/game";
 
 export function GameRoom() {
@@ -62,6 +64,8 @@ export function GameRoom() {
   const [selectedCardsToPass, setSelectedCardsToPass] = useState<CardType[]>(
     []
   );
+  const [showAutoSpectatorModal, setShowAutoSpectatorModal] = useState(false);
+  const [showLeaveConfirmModal, setShowLeaveConfirmModal] = useState(false);
   const cardHandRef = useRef<HTMLDivElement>(null);
   // Use refs for animation state to avoid closure issues in useEffect
   const isAnimatingRef = useRef(false);
@@ -182,30 +186,33 @@ export function GameRoom() {
   });
 
   // Auto-spectate: When visiting a room that's already playing and not a player,
-  // prompt to join as spectator
+  // show modal to join as spectator
   useEffect(() => {
     if (
       room &&
       roomStatus === "playing" &&
       !isPlayerInRoom &&
       !isSpectating &&
-      !spectatorMutations.joinSpectator.isPending
+      !spectatorMutations.joinSpectator.isPending &&
+      !showAutoSpectatorModal
     ) {
       // User arrived at a game in progress without being a player
-      const spectatorName = prompt(
-        "This game is already in progress. Enter your name to watch as a spectator:"
-      );
-      if (spectatorName && spectatorName.trim()) {
-        spectatorMutations.joinSpectator.mutate(spectatorName.trim());
-      }
+      setShowAutoSpectatorModal(true);
     }
   }, [
     room,
     roomStatus,
     isPlayerInRoom,
     isSpectating,
-    spectatorMutations.joinSpectator,
+    spectatorMutations.joinSpectator.isPending,
+    showAutoSpectatorModal,
   ]);
+
+  const handleAutoSpectatorSubmit = (name: string) => {
+    spectatorMutations.joinSpectator.mutate(name, {
+      onSuccess: () => setShowAutoSpectatorModal(false),
+    });
+  };
 
   // Watch for round/game completion via realtime updates (for players who didn't play the last card)
   // This ensures all players see the round summary and game end overlays
@@ -326,9 +333,13 @@ export function GameRoom() {
   };
 
   const handleLeave = () => {
-    if (window.confirm("Are you sure you want to leave this room?")) {
-      lobbyMutations.leaveRoom.mutate();
-    }
+    setShowLeaveConfirmModal(true);
+  };
+
+  const handleConfirmLeave = () => {
+    lobbyMutations.leaveRoom.mutate(undefined, {
+      onSuccess: () => setShowLeaveConfirmModal(false),
+    });
   };
 
   const canLeave = isPlayerInRoom && roomStatus === "waiting";
@@ -603,6 +614,32 @@ export function GameRoom() {
           </AnimatePresence>
         )}
         <AIDebugOverlay />
+
+        {/* Leave Confirm Modal */}
+        <ConfirmModal
+          isOpen={showLeaveConfirmModal}
+          onClose={() => setShowLeaveConfirmModal(false)}
+          onConfirm={handleConfirmLeave}
+          title="Leave Room?"
+          message="Are you sure you want to leave this room? You can rejoin later if there's space."
+          confirmLabel="Leave"
+          isLoading={lobbyMutations.leaveRoom.isPending}
+          variant="danger"
+          icon="leave"
+        />
+
+        {/* Auto-Spectator Modal - shown when arriving at an in-progress game */}
+        <NameInputModal
+          isOpen={showAutoSpectatorModal}
+          onClose={() => setShowAutoSpectatorModal(false)}
+          onSubmit={handleAutoSpectatorSubmit}
+          title="Game in Progress"
+          subtitle="This game has already started. Enter your name to watch as a spectator."
+          placeholder="Your name"
+          submitLabel="Watch Game"
+          isLoading={spectatorMutations.joinSpectator.isPending}
+          variant="spectator"
+        />
       </div>
     );
   }
