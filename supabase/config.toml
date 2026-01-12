@@ -362,10 +362,10 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
-# Scheduled function to clean up abandoned game rooms after 24 hours
+# Edge function to clean up abandoned game rooms
+# Schedule this via the Supabase Dashboard or pg_cron
 [functions.cleanup-rooms]
-# Run every hour at minute 0
-schedule = "0 * * * *"
+verify_jwt = false
 
 [analytics]
 enabled = true
