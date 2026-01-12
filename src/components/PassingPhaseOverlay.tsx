@@ -139,11 +139,10 @@ export function PassingPhaseOverlay({
               return (
                 <motion.div
                   key={`${card.suit}-${card.rank}`}
-                  layout
                   className={cn(
-                    "absolute transition-all duration-150 ease-out",
+                    "absolute",
                     canSelect
-                      ? "cursor-pointer hover:scale-110"
+                      ? "cursor-pointer"
                       : "cursor-not-allowed opacity-60"
                   )}
                   style={{
@@ -153,9 +152,15 @@ export function PassingPhaseOverlay({
                     transformOrigin: "center bottom",
                     zIndex: index, // Maintain natural layering order
                   }}
+                  initial={false}
                   animate={{
                     y: isSelected ? -40 : 0,
                     scale: isSelected ? 1.08 : 1,
+                  }}
+                  transition={{
+                    type: "spring",
+                    stiffness: 400,
+                    damping: 30,
                   }}
                   whileHover={
                     canSelect

@@ -13,7 +13,7 @@ import {
   prepareNewRound,
   resetGameForNewGame,
   startRoundWithPassingPhase,
-  completeRevealPhase,
+  markPlayerReadyForReveal,
   finalizePassingPhase,
   playCard as playCardFn,
 } from "../game/gameLogic";
@@ -39,6 +39,38 @@ import type {
   AIDifficulty,
   Spectator,
 } from "../types/game";
+
+/**
+ * Updates a player's lastSeen timestamp in the game state.
+ * This is used to track player presence for disconnect detection.
+ */
+function updatePlayerLastSeen(
+  gameState: GameState,
+  playerId: string
+): GameState {
+  const playerIndex = gameState.players.findIndex((p) => p.id === playerId);
+  if (playerIndex === -1) return gameState;
+
+  // Don't update lastSeen for AI players
+  if (gameState.players[playerIndex].isAI) return gameState;
+
+  const now = Date.now();
+  const updatedPlayers = gameState.players.map((player, idx) => {
+    if (idx === playerIndex) {
+      return {
+        ...player,
+        lastSeen: now,
+        disconnectedAt: undefined, // Clear disconnected status
+      };
+    }
+    return player;
+  });
+
+  return {
+    ...gameState,
+    players: updatedPlayers,
+  };
+}
 
 interface RoomData {
   id: string;
@@ -106,6 +138,7 @@ export function useLobbyMutations({
         isAI: false,
         hand: [],
         score: 0,
+        lastSeen: Date.now(), // Track when player joined
       };
 
       const updatedGameState: GameState = {
@@ -293,10 +326,63 @@ export function useLobbyMutations({
         updateGameState(result.updatedGameState);
       }
       queryClient.invalidateQueries({ queryKey: ["room", slug] });
-      if (result.endedGame) {
-        alert("A player left the game. The game has ended.");
-      }
+      // No alert needed - user confirmed via modal before this action
       navigate("/");
+    },
+  });
+
+  /**
+   * Returns the room to lobby (waiting) status after a game ends unexpectedly.
+   * Resets game state while keeping remaining players.
+   */
+  const returnToLobby = useMutation({
+    mutationFn: async () => {
+      if (!slug || !room) throw new Error("Room not found");
+      const currentGameState = gameState ?? room.gameState;
+
+      // Reset game state but keep players (and clear their hands/scores)
+      const resetPlayers = currentGameState.players.map((player) => ({
+        ...player,
+        hand: [],
+        score: 0,
+        lastSeen: player.isAI ? undefined : Date.now(),
+        disconnectedAt: undefined,
+      }));
+
+      const resetGameState: GameState = {
+        players: resetPlayers,
+        hands: [],
+        currentTrick: [],
+        lastCompletedTrick: undefined,
+        lastTrickWinnerIndex: undefined,
+        scores: [0, 0, 0, 0],
+        roundScores: [0, 0, 0, 0],
+        heartsBroken: false,
+        roundNumber: 1,
+        currentTrickNumber: 1,
+        isRoundComplete: false,
+        isGameOver: false,
+        winnerIndex: undefined,
+        // Clear the end reason fields
+        endReason: undefined,
+        endedByPlayerName: undefined,
+      };
+
+      await updateRoomGameState(slug, resetGameState);
+      await updateRoomStatus(slug, "waiting");
+
+      return resetGameState;
+    },
+    onSuccess: (updatedGameState) => {
+      updateGameState(updatedGameState);
+      if (room && slug) {
+        setCurrentRoom({
+          roomId: room.id,
+          slug: slug,
+          status: "waiting",
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["room", slug] });
     },
   });
 
@@ -306,6 +392,7 @@ export function useLobbyMutations({
     updateAIDifficulty,
     startGame,
     leaveRoom,
+    returnToLobby,
   };
 }
 
@@ -374,14 +461,20 @@ export function useGameplayMutations({
         throw new Error(result.error);
       }
 
-      const gameOver = result.gameState.scores.some((score) => score >= 100);
+      // Update lastSeen for the player who played (tracks presence)
+      const finalGameState = updatePlayerLastSeen(
+        result.gameState,
+        targetPlayerId
+      );
+
+      const gameOver = finalGameState.scores.some((score) => score >= 100);
       if (gameOver) {
         await updateRoomStatus(slug, "finished");
       }
 
-      await updateRoomGameState(slug, result.gameState);
+      await updateRoomGameState(slug, finalGameState);
 
-      return result.gameState;
+      return finalGameState;
     },
     onSuccess: (updatedGameState) => {
       updateGameState(updatedGameState);
@@ -495,6 +588,12 @@ export function useGameplayMutations({
 
       let updatedGameState = result.gameState;
 
+      // Update lastSeen for the player who submitted (tracks presence)
+      updatedGameState = updatePlayerLastSeen(
+        updatedGameState,
+        currentPlayerId
+      );
+
       if (allPlayersHavePassed(updatedGameState)) {
         const executeResult = executePassPhase(updatedGameState);
         if (executeResult.error) {
@@ -514,10 +613,20 @@ export function useGameplayMutations({
 
   const completeReveal = useMutation({
     mutationFn: async () => {
-      if (!slug || !room) throw new Error("Room not found");
+      if (!slug || !room || !currentPlayerId) throw new Error("Not in room");
       const currentGameState = gameState ?? room.gameState;
 
-      const updatedGameState = completeRevealPhase(currentGameState);
+      // Mark this player as ready (will auto-transition to play when all humans ready)
+      let updatedGameState = markPlayerReadyForReveal(
+        currentGameState,
+        currentPlayerId
+      );
+
+      // Update lastSeen for the current player (tracks presence)
+      updatedGameState = updatePlayerLastSeen(
+        updatedGameState,
+        currentPlayerId
+      );
 
       await updateRoomGameState(slug, updatedGameState);
       return updatedGameState;

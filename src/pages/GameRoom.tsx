@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence } from "framer-motion";
@@ -8,6 +8,9 @@ import { useRoomSync } from "../hooks/useRoomSync";
 import { useRoomNavigationBlocker } from "../hooks/useRoomNavigationBlocker";
 import { usePageUnloadWarning } from "../hooks/usePageUnloadWarning";
 import { useRecordGameResult } from "../hooks/useRecordGameResult";
+import { usePlayerPresence } from "../hooks/usePlayerPresence";
+import { useDisconnectionDetection } from "../hooks/useDisconnectionDetection";
+import { usePlayerReconnection } from "../hooks/usePlayerReconnection";
 import {
   useLobbyMutations,
   useGameplayMutations,
@@ -18,6 +21,7 @@ import { STORAGE_KEYS, getAIDelayFromSpeed } from "../lib/constants";
 import { getStoredAISpeed } from "../lib/settings";
 import { chooseAICard } from "../lib/ai";
 import { hasPlayerSubmittedPass } from "../game/passingLogic";
+import { hasPlayerConfirmedReveal } from "../game/gameLogic";
 import { cardsEqual } from "../game/cardDisplay";
 import { GameTable } from "../components/GameTable";
 import { GameEndOverlay } from "../components/GameEndOverlay";
@@ -30,6 +34,8 @@ import { GameHeader } from "../components/GameHeader";
 import { SpectatorControls } from "../components/SpectatorControls";
 import { NameInputModal } from "../components/NameInputModal";
 import { ConfirmModal } from "../components/ConfirmModal";
+import { DisconnectionOverlay } from "../components/DisconnectionOverlay";
+import { GameEndedOverlay } from "../components/GameEndedOverlay";
 import type { Card as CardType } from "../types/game";
 
 export function GameRoom() {
@@ -98,6 +104,13 @@ export function GameRoom() {
   const showGameEnd =
     !!currentGameState?.isGameOver &&
     currentGameState?.winnerIndex !== undefined;
+
+  // Show "game ended unexpectedly" overlay when game was ended by player leaving/disconnecting
+  const showGameEndedUnexpectedly =
+    roomStatus === "finished" &&
+    currentGameState?.endReason &&
+    (currentGameState.endReason === "player_left" ||
+      currentGameState.endReason === "player_disconnected");
 
   // Test mode: enabled via URL param or if all players are AI
   const isTestMode =
@@ -169,7 +182,54 @@ export function GameRoom() {
     !spectatorMutations.joinSpectator.isPending &&
     !dismissedSpectatorPrompt;
 
-  useRoomNavigationBlocker({
+  // Handle reconnection for returning players
+  usePlayerReconnection({
+    slug: slug ?? null,
+    gameState: currentGameState,
+    roomStatus,
+    currentPlayerId,
+    setCurrentPlayerId,
+    updateGameState,
+  });
+
+  // Get current player's name for presence tracking
+  const currentPlayerName = currentPlayer?.name ?? null;
+
+  // Track player presence using Supabase Realtime Presence
+  // This automatically detects when players close their browser, lose connection, etc.
+  const { onlinePlayerIds } = usePlayerPresence({
+    slug: slug ?? null,
+    playerId: currentPlayerId,
+    playerName: currentPlayerName,
+    enabled: isPlayerInRoom && !isSpectating,
+  });
+
+  // Callback when game ends due to disconnection
+  const handleGameEndedByDisconnection = useCallback(() => {
+    // The game has ended because a player disconnected and didn't reconnect
+    // No need to navigate - the room status change will be picked up by realtime
+  }, []);
+
+  // Detect disconnected players and manage grace period
+  const { disconnectedPlayers, isWaitingForReconnection } =
+    useDisconnectionDetection({
+      slug: slug ?? null,
+      gameState: currentGameState,
+      roomStatus,
+      currentPlayerId,
+      onlinePlayerIds,
+      enabled: isPlayerInRoom && !isSpectating,
+      onGameEnded: handleGameEndedByDisconnection,
+    });
+
+  // Navigation blocker - now returns state for modal instead of using window.confirm
+  const {
+    isBlocked: isNavigationBlocked,
+    isLeaving: isNavigationLeaving,
+    blockMessage: navigationBlockMessage,
+    handleConfirmLeave: handleConfirmNavigation,
+    handleCancelLeave: handleCancelNavigation,
+  } = useRoomNavigationBlocker({
     slug: slug ?? null,
     isPlayerInRoom,
     roomStatus,
@@ -385,8 +445,12 @@ export function GameRoom() {
   }
 
   // Show game table when playing or when game just finished (to show GameEndOverlay)
+  // Also show when game ended unexpectedly (player left/disconnected)
   // Spectators also see the game table when game is playing
-  if (roomStatus === "playing" || (roomStatus === "finished" && showGameEnd)) {
+  if (
+    roomStatus === "playing" ||
+    (roomStatus === "finished" && (showGameEnd || showGameEndedUnexpectedly))
+  ) {
     return (
       <div className="flex flex-col h-screen w-full overflow-hidden bg-gradient-to-b from-gray-800 to-gray-900">
         <GameHeader
@@ -455,7 +519,7 @@ export function GameRoom() {
             />
           )}
 
-          {/* Game End Overlay */}
+          {/* Game End Overlay - Normal game completion */}
           {showGameEnd &&
             currentGameState &&
             currentGameState.winnerIndex !== undefined && (
@@ -467,6 +531,21 @@ export function GameRoom() {
                 onNewGame={() => gameplayMutations.newGame.mutate()}
                 onGoHome={handleGoHome}
                 isLoading={gameplayMutations.newGame.isPending}
+              />
+            )}
+
+          {/* Game Ended Unexpectedly Overlay - Player left or disconnected */}
+          {showGameEndedUnexpectedly &&
+            currentGameState &&
+            (currentGameState.endReason === "player_left" ||
+              currentGameState.endReason === "player_disconnected") && (
+              <GameEndedOverlay
+                key="game-ended-unexpectedly"
+                endReason={currentGameState.endReason}
+                playerName={currentGameState.endedByPlayerName}
+                onGoToLobby={() => lobbyMutations.returnToLobby.mutate()}
+                isLoadingLobby={lobbyMutations.returnToLobby.isPending}
+                isPlayerInRoom={isPlayerInRoom}
               />
             )}
         </AnimatePresence>
@@ -526,6 +605,22 @@ export function GameRoom() {
                 const receivedCards =
                   currentGameState.receivedCards[playerIndex] || [];
 
+                // Check if this player has already confirmed ready
+                const hasConfirmedReady = hasPlayerConfirmedReveal(
+                  currentGameState,
+                  currentPlayerId
+                );
+
+                // Get list of human players still reviewing
+                const waitingForPlayers = players
+                  .filter(
+                    (p) =>
+                      !p.isAI &&
+                      p.id !== currentPlayerId &&
+                      !hasPlayerConfirmedReveal(currentGameState, p.id)
+                  )
+                  .map((p) => p.name);
+
                 return (
                   <ReceivedCardsOverlay
                     key="reveal-phase"
@@ -535,12 +630,21 @@ export function GameRoom() {
                     receivedCards={receivedCards}
                     onReady={() => gameplayMutations.completeReveal.mutate()}
                     isLoading={gameplayMutations.completeReveal.isPending}
+                    hasConfirmedReady={hasConfirmedReady}
+                    waitingForPlayers={waitingForPlayers}
                   />
                 );
               })()}
           </AnimatePresence>
         )}
         <AIDebugOverlay />
+
+        {/* Disconnection Overlay - shows when waiting for player to reconnect */}
+        <AnimatePresence>
+          {isWaitingForReconnection && (
+            <DisconnectionOverlay disconnectedPlayers={disconnectedPlayers} />
+          )}
+        </AnimatePresence>
 
         {/* Leave Confirm Modal */}
         <ConfirmModal
@@ -551,6 +655,20 @@ export function GameRoom() {
           message="Are you sure you want to leave this room? You can rejoin later if there's space."
           confirmLabel="Leave"
           isLoading={lobbyMutations.leaveRoom.isPending}
+          variant="danger"
+          icon="leave"
+        />
+
+        {/* Navigation Blocker Modal - shown when trying to navigate away */}
+        <ConfirmModal
+          isOpen={isNavigationBlocked}
+          onClose={handleCancelNavigation}
+          onConfirm={handleConfirmNavigation}
+          title="Leave Game?"
+          message={navigationBlockMessage}
+          confirmLabel="Leave"
+          cancelLabel="Stay"
+          isLoading={isNavigationLeaving}
           variant="danger"
           icon="leave"
         />

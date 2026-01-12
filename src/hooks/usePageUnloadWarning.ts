@@ -6,6 +6,10 @@ interface UsePageUnloadWarningProps {
   enabled: boolean;
 }
 
+/**
+ * Shows browser's native "Leave site?" dialog when user tries to
+ * close/refresh the page while in an active game room.
+ */
 export function usePageUnloadWarning({
   isPlayerInRoom,
   roomStatus,
@@ -15,7 +19,9 @@ export function usePageUnloadWarning({
     if (!enabled || !isPlayerInRoom) return;
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (roomStatus === "waiting") {
+      // Warn during both waiting and playing states
+      // Only skip the warning for finished games
+      if (roomStatus === "waiting" || roomStatus === "playing") {
         e.preventDefault();
         e.returnValue = "";
       }

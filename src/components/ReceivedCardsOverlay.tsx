@@ -19,6 +19,10 @@ interface ReceivedCardsOverlayProps {
   receivedCards: CardType[];
   onReady: () => void;
   isLoading: boolean;
+  /** Whether this player has already confirmed they're ready */
+  hasConfirmedReady: boolean;
+  /** Names of human players still reviewing their cards */
+  waitingForPlayers: string[];
 }
 
 export function ReceivedCardsOverlay({
@@ -28,6 +32,8 @@ export function ReceivedCardsOverlay({
   receivedCards,
   onReady,
   isLoading,
+  hasConfirmedReady,
+  waitingForPlayers,
 }: ReceivedCardsOverlayProps) {
   const currentPlayer = players[currentPlayerIndex];
   const hand = currentPlayer?.hand || [];
@@ -219,55 +225,78 @@ export function ReceivedCardsOverlay({
           })}
         </motion.div>
 
-        {/* Ready button */}
+        {/* Ready button or waiting state */}
         <motion.div
           initial={{ y: 30, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 1 }}
         >
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={onReady}
-            disabled={isLoading}
-            className={cn(
-              // Layout & spacing
-              "px-10 py-4 rounded-xl",
-              // Typography
-              "font-semibold text-lg text-white",
-              // Visual styling
-              "bg-gradient-to-r from-green-500 to-emerald-600",
-              "shadow-lg hover:shadow-xl hover:shadow-green-500/30",
-              // Interactions
-              "transition-all cursor-pointer",
-              "disabled:opacity-50"
-            )}
-          >
-            {isLoading ? (
-              <span className="flex items-center gap-2">
+          {hasConfirmedReady ? (
+            <div className="flex flex-col items-center gap-3">
+              <div className="flex items-center gap-2 text-white/80 text-lg">
                 <motion.span
                   animate={{ rotate: 360 }}
-                  transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                  transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+                  className="text-2xl"
                 >
                   ⏳
                 </motion.span>
-                Starting...
-              </span>
-            ) : (
-              "Ready to Play! 🃏"
-            )}
-          </motion.button>
+                <span>Waiting for other players...</span>
+              </div>
+              {waitingForPlayers.length > 0 && (
+                <p className="text-white/50 text-sm">
+                  {waitingForPlayers.join(", ")}{" "}
+                  {waitingForPlayers.length === 1 ? "is" : "are"} still reviewing
+                </p>
+              )}
+            </div>
+          ) : (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onReady}
+              disabled={isLoading}
+              className={cn(
+                // Layout & spacing
+                "px-10 py-4 rounded-xl",
+                // Typography
+                "font-semibold text-lg text-white",
+                // Visual styling
+                "bg-gradient-to-r from-green-500 to-emerald-600",
+                "shadow-lg hover:shadow-xl hover:shadow-green-500/30",
+                // Interactions
+                "transition-all cursor-pointer",
+                "disabled:opacity-50"
+              )}
+            >
+              {isLoading ? (
+                <span className="flex items-center gap-2">
+                  <motion.span
+                    animate={{ rotate: 360 }}
+                    transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                  >
+                    ⏳
+                  </motion.span>
+                  Starting...
+                </span>
+              ) : (
+                "Ready to Play! 🃏"
+              )}
+            </motion.button>
+          )}
         </motion.div>
 
         {/* Hint */}
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.2 }}
-          className="mt-4 text-white/40 text-sm"
-        >
-          Click when you're ready to start the round
-        </motion.p>
+        {!hasConfirmedReady && (
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.2 }}
+            className="mt-4 text-white/40 text-sm"
+          >
+            Click when you're ready to start the round
+          </motion.p>
+        )}
       </div>
     </motion.div>
   );

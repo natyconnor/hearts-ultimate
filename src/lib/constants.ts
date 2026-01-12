@@ -31,3 +31,19 @@ export const GAME_CONFIG = {
   TOTAL_CARDS: 52,
   GAME_END_SCORE: 100, // Game ends when any player reaches this score or higher
 } as const;
+
+// Player connection/disconnection settings
+// Uses Supabase Presence for real-time disconnect detection
+export const CONNECTION_CONFIG = {
+  /**
+   * Delay before starting to check for disconnections (ms).
+   * Gives players time to establish their presence connection after game starts.
+   */
+  INITIAL_DETECTION_DELAY: 10_000, // 10 seconds
+
+  /**
+   * How long to wait for a disconnected player to reconnect before ending game (ms).
+   * This is the "grace period" shown in the countdown overlay.
+   */
+  GRACE_PERIOD: 60_000, // 60 seconds (1 minute)
+} as const;

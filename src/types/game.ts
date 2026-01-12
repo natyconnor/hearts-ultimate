@@ -27,6 +27,10 @@ export interface Player {
   difficulty?: AIDifficulty; // Only for AI players
   hand: Card[];
   score: number;
+  /** Timestamp (ms) when player last sent a heartbeat - used for disconnect detection */
+  lastSeen?: number;
+  /** Timestamp (ms) when player was first detected as disconnected - used for grace period */
+  disconnectedAt?: number;
 }
 
 // Pass direction rotates each round: left, right, across, none (hold)
@@ -63,6 +67,7 @@ export interface GameState {
   // Reveal phase fields (after passing, before play)
   isRevealPhase?: boolean; // True when showing received cards
   receivedCards?: Card[][]; // Cards each player received (indexed by player index)
+  revealReadyPlayerIds?: string[]; // Player IDs who have clicked "Ready" during reveal phase
 
   // Points cards taken during the round (for round summary)
   // Only contains penalty cards: hearts (1pt each) and Queen of Spades (13pts)
@@ -74,6 +79,11 @@ export interface GameState {
 
   // Moon shooting tracking (set BEFORE scores are adjusted)
   shotTheMoon?: { playerIndex: number } | null;
+
+  // Game end reason (for showing appropriate message)
+  endReason?: "completed" | "player_left" | "player_disconnected";
+  /** Name of player who caused the game to end (for disconnection/leaving) */
+  endedByPlayerName?: string;
 }
 
 /** Scores from a completed round, stored in round history */

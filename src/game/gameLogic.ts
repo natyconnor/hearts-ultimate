@@ -305,14 +305,69 @@ export function finalizePassingPhase(gameState: GameState): GameState {
 }
 
 /**
- * Completes the reveal phase and starts play
- * Called when player clicks "Ready to Play" after seeing received cards
+ * Marks a player as ready during the reveal phase.
+ * Returns updated game state, potentially transitioning to play if all human players are ready.
+ */
+export function markPlayerReadyForReveal(
+  gameState: GameState,
+  playerId: string
+): GameState {
+  if (!gameState.isRevealPhase) {
+    return gameState;
+  }
+
+  const currentReadyIds = gameState.revealReadyPlayerIds ?? [];
+
+  // Already marked as ready
+  if (currentReadyIds.includes(playerId)) {
+    return gameState;
+  }
+
+  const updatedReadyIds = [...currentReadyIds, playerId];
+
+  // Check if all human players are now ready
+  const humanPlayers = gameState.players.filter((p) => !p.isAI);
+  const allHumansReady = humanPlayers.every((p) =>
+    updatedReadyIds.includes(p.id)
+  );
+
+  if (allHumansReady) {
+    // All humans ready - transition to play
+    return initializeRound({
+      ...gameState,
+      isRevealPhase: false,
+      receivedCards: undefined,
+      revealReadyPlayerIds: undefined,
+    });
+  }
+
+  // Not all ready yet - just update the ready list
+  return {
+    ...gameState,
+    revealReadyPlayerIds: updatedReadyIds,
+  };
+}
+
+/**
+ * Checks if a player has marked themselves as ready during reveal phase
+ */
+export function hasPlayerConfirmedReveal(
+  gameState: GameState,
+  playerId: string
+): boolean {
+  return gameState.revealReadyPlayerIds?.includes(playerId) ?? false;
+}
+
+/**
+ * @deprecated Use markPlayerReadyForReveal instead for proper per-player tracking
+ * Completes the reveal phase and starts play (legacy - used for AI-only transitions)
  */
 export function completeRevealPhase(gameState: GameState): GameState {
   return initializeRound({
     ...gameState,
     isRevealPhase: false,
     receivedCards: undefined,
+    revealReadyPlayerIds: undefined,
   });
 }
 

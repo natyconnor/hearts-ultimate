@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useBlocker } from "react-router-dom";
 import {
   updateRoomGameState,
@@ -17,16 +17,30 @@ interface UseRoomNavigationBlockerProps {
   currentGameState: GameState | null;
 }
 
+interface UseRoomNavigationBlockerReturn {
+  /** Whether navigation is currently blocked and waiting for user confirmation */
+  isBlocked: boolean;
+  /** Whether we're currently processing the leave action */
+  isLeaving: boolean;
+  /** The message to show to the user in the confirmation modal */
+  blockMessage: string;
+  /** Call this when user confirms they want to leave */
+  handleConfirmLeave: () => Promise<void>;
+  /** Call this when user cancels and wants to stay */
+  handleCancelLeave: () => void;
+}
+
 export function useRoomNavigationBlocker({
   slug,
   isPlayerInRoom,
   roomStatus,
   currentPlayerId,
   currentGameState,
-}: UseRoomNavigationBlockerProps) {
+}: UseRoomNavigationBlockerProps): UseRoomNavigationBlockerReturn {
   const { clearCurrentRoom } = useGameStore();
   const isPlayerInRoomRef = useRef(isPlayerInRoom);
   const roomStatusRef = useRef(roomStatus);
+  const [isLeaving, setIsLeaving] = useState(false);
 
   useEffect(() => {
     isPlayerInRoomRef.current = isPlayerInRoom;
@@ -41,61 +55,85 @@ export function useRoomNavigationBlocker({
     );
   });
 
-  useEffect(() => {
+  const isBlocked = blocker.state === "blocked";
+
+  const blockMessage =
+    roomStatusRef.current === "playing"
+      ? "You are leaving an active game. This will end the game for everyone. Are you sure?"
+      : "You are leaving the room. Do you want to leave?";
+
+  const handleCancelLeave = useCallback(() => {
+    if (blocker.state === "blocked") {
+      blocker.reset();
+    }
+  }, [blocker]);
+
+  const handleConfirmLeave = useCallback(async () => {
     if (blocker.state !== "blocked") return;
     if (!currentPlayerId || !currentGameState || !slug) {
       blocker.reset();
       return;
     }
 
-    const message =
-      roomStatusRef.current === "playing"
-        ? "You are leaving an active game. This will end the game for everyone. Are you sure?"
-        : "You are leaving the room. Do you want to leave the game?";
+    setIsLeaving(true);
 
-    const shouldLeave = window.confirm(message);
-    if (!shouldLeave) {
-      blocker.reset();
-      return;
-    }
+    try {
+      const currentRoomStatus = roomStatusRef.current;
+      const leavingPlayer = currentGameState.players.find(
+        (p) => p.id === currentPlayerId
+      );
+      const updatedPlayers = currentGameState.players.filter(
+        (p) => p.id !== currentPlayerId
+      );
+      const updatedGameState: GameState = {
+        ...currentGameState,
+        players: updatedPlayers,
+        // If leaving during a game, mark the reason
+        ...(currentRoomStatus === "playing" && {
+          endReason: "player_left" as const,
+          endedByPlayerName: leavingPlayer?.name,
+        }),
+      };
 
-    const currentRoomStatus = roomStatusRef.current;
-    const updatedPlayers = currentGameState.players.filter(
-      (p) => p.id !== currentPlayerId
-    );
-    const updatedGameState: GameState = {
-      ...currentGameState,
-      players: updatedPlayers,
-    };
+      // If this was the last player, delete the room
+      const isRoomEmpty = updatedPlayers.length === 0;
 
-    // If this was the last player, delete the room
-    const isRoomEmpty = updatedPlayers.length === 0;
-
-    const promises: Promise<void>[] = [];
-    if (isRoomEmpty) {
-      promises.push(deleteRoom(slug));
-    } else {
-      promises.push(updateRoomGameState(slug, updatedGameState));
-      if (currentRoomStatus === "playing") {
-        promises.push(updateRoomStatus(slug, "finished"));
-      }
-    }
-
-    Promise.all(promises)
-      .then(() => {
-        localStorage.removeItem(STORAGE_KEYS.PLAYER_ID);
-        localStorage.removeItem(STORAGE_KEYS.PLAYER_NAME);
-        clearCurrentRoom();
+      const promises: Promise<void>[] = [];
+      if (isRoomEmpty) {
+        promises.push(deleteRoom(slug));
+      } else {
+        promises.push(updateRoomGameState(slug, updatedGameState));
         if (currentRoomStatus === "playing") {
-          alert("You left the game. The game has ended for all players.");
+          promises.push(updateRoomStatus(slug, "finished"));
         }
-        blocker.proceed();
-      })
-      .catch((err) => {
-        console.error("Failed to leave room:", err);
-        blocker.reset();
-      });
+      }
+
+      await Promise.all(promises);
+
+      localStorage.removeItem(STORAGE_KEYS.PLAYER_ID);
+      localStorage.removeItem(STORAGE_KEYS.PLAYER_NAME);
+      clearCurrentRoom();
+      blocker.proceed();
+    } catch (err) {
+      console.error("Failed to leave room:", err);
+      blocker.reset();
+    } finally {
+      setIsLeaving(false);
+    }
   }, [blocker, currentPlayerId, currentGameState, slug, clearCurrentRoom]);
 
-  return blocker;
+  // Auto-reset blocker if we don't have the required data
+  useEffect(() => {
+    if (blocker.state === "blocked" && (!currentPlayerId || !currentGameState || !slug)) {
+      blocker.reset();
+    }
+  }, [blocker, currentPlayerId, currentGameState, slug]);
+
+  return {
+    isBlocked,
+    isLeaving,
+    blockMessage,
+    handleConfirmLeave,
+    handleCancelLeave,
+  };
 }

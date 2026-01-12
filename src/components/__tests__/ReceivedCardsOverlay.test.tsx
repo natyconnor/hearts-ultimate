@@ -22,6 +22,8 @@ describe("ReceivedCardsOverlay Component", () => {
     receivedCards,
     onReady: vi.fn(),
     isLoading: false,
+    hasConfirmedReady: false,
+    waitingForPlayers: [],
   };
 
   beforeEach(() => {
@@ -158,6 +160,57 @@ describe("ReceivedCardsOverlay Component", () => {
       render(<ReceivedCardsOverlay {...defaultProps} />);
       // Sender is AI
       expect(screen.getByText(/🤖/)).toBeInTheDocument();
+    });
+  });
+
+  describe("Waiting State (after player clicks Ready)", () => {
+    it("shows waiting message when player has confirmed", () => {
+      render(
+        <ReceivedCardsOverlay {...defaultProps} hasConfirmedReady={true} />
+      );
+      expect(
+        screen.getByText("Waiting for other players...")
+      ).toBeInTheDocument();
+    });
+
+    it("hides Ready button when player has confirmed", () => {
+      render(
+        <ReceivedCardsOverlay {...defaultProps} hasConfirmedReady={true} />
+      );
+      expect(screen.queryByText("Ready to Play! 🃏")).not.toBeInTheDocument();
+    });
+
+    it("shows names of players still reviewing", () => {
+      render(
+        <ReceivedCardsOverlay
+          {...defaultProps}
+          hasConfirmedReady={true}
+          waitingForPlayers={["Alice", "Bob"]}
+        />
+      );
+      expect(screen.getByText(/Alice, Bob/)).toBeInTheDocument();
+      expect(screen.getByText(/are still reviewing/)).toBeInTheDocument();
+    });
+
+    it("shows singular form for one player waiting", () => {
+      render(
+        <ReceivedCardsOverlay
+          {...defaultProps}
+          hasConfirmedReady={true}
+          waitingForPlayers={["Alice"]}
+        />
+      );
+      expect(screen.getByText(/Alice/)).toBeInTheDocument();
+      expect(screen.getByText(/is still reviewing/)).toBeInTheDocument();
+    });
+
+    it("hides hint text when already confirmed", () => {
+      render(
+        <ReceivedCardsOverlay {...defaultProps} hasConfirmedReady={true} />
+      );
+      expect(
+        screen.queryByText("Click when you're ready to start the round")
+      ).not.toBeInTheDocument();
     });
   });
 
