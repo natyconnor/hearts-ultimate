@@ -95,6 +95,7 @@ export interface GameRoom {
   id: string;
   slug: string;
   createdAt?: string;
+  updatedAt?: string;
   gameState: GameState;
   status: "waiting" | "playing" | "finished";
   spectators: Spectator[];

@@ -42,6 +42,7 @@ export async function createRoom(slug: string): Promise<GameRoom> {
     status: data.status as "waiting" | "playing" | "finished",
     gameState: data.game_state as GameState,
     createdAt: data.created_at,
+    updatedAt: data.updated_at,
     spectators: (data.spectators as Spectator[]) ?? [],
   };
 }
@@ -70,6 +71,7 @@ export async function getRoomBySlug(slug: string): Promise<GameRoom | null> {
     status: data.status as "waiting" | "playing" | "finished",
     gameState: data.game_state as GameState,
     createdAt: data.created_at,
+    updatedAt: data.updated_at,
     spectators: (data.spectators as Spectator[]) ?? [],
   };
 }
@@ -112,10 +114,7 @@ export async function updateRoomStatus(
  * Deletes a room by its slug
  */
 export async function deleteRoom(slug: string): Promise<void> {
-  const { error } = await supabase
-    .from("game_rooms")
-    .delete()
-    .eq("slug", slug);
+  const { error } = await supabase.from("game_rooms").delete().eq("slug", slug);
 
   if (error) {
     throw new Error(`Failed to delete room: ${error.message}`);
