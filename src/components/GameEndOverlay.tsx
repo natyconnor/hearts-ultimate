@@ -70,7 +70,7 @@ export function GameEndOverlay({
         initial={{ scale: 0.8, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         transition={{ type: "spring", damping: 25, stiffness: 300 }}
-        className="relative max-w-lg w-full mx-4 overflow-hidden"
+        className="relative max-w-lg w-full mx-4 overflow-hidden rounded-3xl"
       >
         {/* Decorative background */}
         <div className="absolute inset-0 bg-gradient-to-br from-amber-900 via-amber-800 to-amber-900 rounded-3xl" />
