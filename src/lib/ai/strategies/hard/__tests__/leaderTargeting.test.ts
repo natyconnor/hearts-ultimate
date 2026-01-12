@@ -1,10 +1,15 @@
 import { describe, it, expect } from "vitest";
 import { scoreDumpCards } from "../dumpScoring";
 import { CardMemory } from "../../../memory/cardMemory";
-import { DEFAULT_AI_CONFIG, DUMP_SCORES, AGGRESSIVENESS } from "../../../constants";
+import {
+  DEFAULT_AI_CONFIG,
+  DUMP_SCORES,
+  AGGRESSIVENESS,
+} from "../../../constants";
 import { getAggressivenessModifiers } from "../aggressiveness";
 import type { PlayContext } from "../../../types";
 import type { GameState, Card } from "../../../../../types/game";
+import { createCard } from "../../../../../game/deck";
 
 // Helper to create a minimal game state
 function createGameState(scores: number[]): GameState {
@@ -46,8 +51,8 @@ function createContext(
 }
 
 // Create the Q♠ card
-const queenOfSpades: Card = { suit: "spades", rank: 12 };
-const aceOfHearts: Card = { suit: "hearts", rank: 14 };
+const queenOfSpades: Card = createCard("spades", 12);
+const aceOfHearts: Card = createCard("hearts", 14);
 
 describe("Leader Targeting - Queen of Spades", () => {
   it("should give full bonus when winner IS the leader", () => {
@@ -73,7 +78,9 @@ describe("Leader Targeting - Queen of Spades", () => {
     // Should get full Q♠ bonus (200) + dump on leader bonus (30) = 330 total
     // Plus base 100 = 330
     expect(scored[0].score).toBeGreaterThanOrEqual(
-      DUMP_SCORES.BASE + DUMP_SCORES.QUEEN_OF_SPADES + DUMP_SCORES.DUMP_ON_LEADER
+      DUMP_SCORES.BASE +
+        DUMP_SCORES.QUEEN_OF_SPADES +
+        DUMP_SCORES.DUMP_ON_LEADER
     );
     expect(scored[0].reasons).toContain("Dump Q♠ on leader!");
   });
@@ -221,7 +228,8 @@ describe("Leader Targeting - Hearts", () => {
     );
 
     // Should get heart bonus + leader bonus
-    const baseHeartBonus = DUMP_SCORES.HEART_BASE + 14 * DUMP_SCORES.HEART_RANK_MULTIPLIER;
+    const baseHeartBonus =
+      DUMP_SCORES.HEART_BASE + 14 * DUMP_SCORES.HEART_RANK_MULTIPLIER;
     expect(scored[0].score).toBe(
       DUMP_SCORES.BASE + baseHeartBonus + DUMP_SCORES.DUMP_ON_LEADER
     );
@@ -264,9 +272,13 @@ describe("Leader Targeting - Hearts", () => {
     // Q♠ base = 200, reduced to 200 * 0.3 = 60
     // Heart base = 50 + 14*3 = 92, reduced to 92 * 0.65 = 59.8
     // The percentage reduction for hearts should be smaller
-    const qsReduction = (DUMP_SCORES.QUEEN_OF_SPADES - (qsScored[0].score - DUMP_SCORES.BASE)) / DUMP_SCORES.QUEEN_OF_SPADES;
-    const heartBase = DUMP_SCORES.HEART_BASE + 14 * DUMP_SCORES.HEART_RANK_MULTIPLIER;
-    const heartReduction = (heartBase - (heartScored[0].score - DUMP_SCORES.BASE)) / heartBase;
+    const qsReduction =
+      (DUMP_SCORES.QUEEN_OF_SPADES - (qsScored[0].score - DUMP_SCORES.BASE)) /
+      DUMP_SCORES.QUEEN_OF_SPADES;
+    const heartBase =
+      DUMP_SCORES.HEART_BASE + 14 * DUMP_SCORES.HEART_RANK_MULTIPLIER;
+    const heartReduction =
+      (heartBase - (heartScored[0].score - DUMP_SCORES.BASE)) / heartBase;
 
     // Heart reduction should be about half of Q♠ reduction
     expect(heartReduction).toBeLessThan(qsReduction);
@@ -281,6 +293,8 @@ describe("Leader Targeting Factor Calculation", () => {
 
     expect(conservative.leaderTargetingFactor).toBe(0);
     expect(balanced.leaderTargetingFactor).toBeCloseTo(0.35);
-    expect(aggressive.leaderTargetingFactor).toBeCloseTo(AGGRESSIVENESS.LEADER_TARGETING_MAX);
+    expect(aggressive.leaderTargetingFactor).toBeCloseTo(
+      AGGRESSIVENESS.LEADER_TARGETING_MAX
+    );
   });
 });
