@@ -175,10 +175,12 @@ export function GameRoom() {
     ? players.find((p) => p.id === currentPlayerId) ?? null
     : null;
   const isPlayerInRoom = !!currentPlayer;
-  const isSpectating = !!currentSpectatorId;
   const currentSpectator = currentSpectatorId
     ? spectators.find((s) => s.id === currentSpectatorId) ?? null
     : null;
+  // Only consider "spectating" if the spectator ID is valid for THIS room's spectator list
+  // This prevents a flash of SpectatorControls when leaving a game with a stale spectator ID
+  const isSpectating = !!currentSpectator;
 
   // Auto-spectate: derived state for when to show the prompt
   const showAutoSpectatorModal =

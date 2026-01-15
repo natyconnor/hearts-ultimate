@@ -111,6 +111,9 @@ export function useRoomNavigationBlocker({
 
       localStorage.removeItem(STORAGE_KEYS.PLAYER_ID);
       localStorage.removeItem(STORAGE_KEYS.PLAYER_NAME);
+      // Also clear spectator IDs to prevent stale state when navigating away
+      localStorage.removeItem(STORAGE_KEYS.SPECTATOR_ID);
+      localStorage.removeItem(STORAGE_KEYS.SPECTATOR_NAME);
       clearCurrentRoom();
       blocker.proceed();
     } catch (err) {

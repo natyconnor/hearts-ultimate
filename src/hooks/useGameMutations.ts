@@ -171,6 +171,9 @@ export function useLobbyMutations({
 
         localStorage.setItem(STORAGE_KEYS.PLAYER_ID, playerId);
         localStorage.setItem(STORAGE_KEYS.PLAYER_NAME, playerName);
+        // Clear any stale spectator IDs when joining as a player
+        localStorage.removeItem(STORAGE_KEYS.SPECTATOR_ID);
+        localStorage.removeItem(STORAGE_KEYS.SPECTATOR_NAME);
         setCurrentPlayerId(playerId);
         updateGameState(updatedGameState);
         setJoinRoomState({ isPending: false, isError: false, error: null });
