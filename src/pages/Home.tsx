@@ -1,16 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation } from "convex/react";
 import { useNavigate } from "react-router-dom";
 import { useGameStore } from "../store/gameStore";
 import { generateSlug } from "../lib/slugGenerator";
 import type { AIDifficulty, GameState } from "../types/game";
-import {
-  createRoom,
-  getRoomBySlug,
-  updateRoomGameState,
-  updateRoomStatus,
-} from "../lib/roomApi";
+import { api } from "../../convex/_generated/api";
 import { createAIPlayer } from "../lib/aiPlayers";
 import { createAndDeal } from "../game/deck";
 import {
@@ -100,6 +95,15 @@ export function Home() {
     useGameStore();
   const [_testDifficulty, setTestDifficulty] =
     useState<TestDifficulty>("medium");
+  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
+  const [isCreatingTestRoom, setIsCreatingTestRoom] = useState(false);
+  const [isJoiningRoom, setIsJoiningRoom] = useState(false);
+  const [mutationError, setMutationError] = useState<Error | null>(null);
+
+  // Convex mutations
+  const createRoomMutation = useMutation(api.rooms.create);
+  const updateGameStateMutation = useMutation(api.rooms.updateGameState);
+  const updateStatusMutation = useMutation(api.rooms.updateStatus);
 
   // Clear any stale room/spectator data when arriving at Home
   useEffect(() => {
@@ -113,69 +117,67 @@ export function Home() {
     }
   }, [clearCurrentRoom]);
 
-  const createRoomMutation = useMutation({
-    mutationFn: async (slug: string) => {
-      setLoading(true);
-      setError(null);
-      return createRoom(slug);
-    },
-    onSuccess: (room) => {
-      setCurrentRoom({
-        roomId: room.id,
-        slug: room.slug,
-        status: room.status,
-      });
-      setLoading(false);
-      navigate(`/room/${room.slug}`);
-    },
-    onError: (error: Error) => {
-      setLoading(false);
-      setError(error.message);
-    },
-  });
-
-  const joinRoomMutation = useMutation({
-    mutationFn: async (slug: string) => {
-      setLoading(true);
-      setError(null);
-      const room = await getRoomBySlug(slug);
-      if (!room) {
-        throw new Error("Room not found");
-      }
-      return room;
-    },
-    onSuccess: (room) => {
-      setCurrentRoom({
-        roomId: room.id,
-        slug: room.slug,
-        status: room.status,
-      });
-      setLoading(false);
-      navigate(`/room/${room.slug}`);
-    },
-    onError: (error: Error) => {
-      setLoading(false);
-      setError(error.message);
-    },
-  });
-
-  const handleCreateGame = () => {
+  const handleCreateGame = async () => {
     const slug = generateSlug();
-    createRoomMutation.mutate(slug);
+    setIsCreatingRoom(true);
+    setMutationError(null);
+    setLoading(true);
+    setError(null);
+
+    try {
+      const room = await createRoomMutation({ slug });
+      if (room) {
+        setCurrentRoom({
+          roomId: room._id,
+          slug: room.slug,
+          status: room.status,
+        });
+        setLoading(false);
+        navigate(`/room/${room.slug}`);
+      }
+    } catch (error) {
+      setLoading(false);
+      const err = error instanceof Error ? error : new Error("Failed to create room");
+      setError(err.message);
+      setMutationError(err);
+    } finally {
+      setIsCreatingRoom(false);
+    }
   };
 
-  const handleJoinRoom = (slug: string) => {
-    joinRoomMutation.mutate(slug);
+  const handleJoinRoom = async (slug: string) => {
+    setIsJoiningRoom(true);
+    setMutationError(null);
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Navigate to the room - the room page will handle checking if it exists
+      setLoading(false);
+      navigate(`/room/${slug}`);
+    } catch (error) {
+      setLoading(false);
+      const err = error instanceof Error ? error : new Error("Failed to join room");
+      setError(err.message);
+      setMutationError(err);
+    } finally {
+      setIsJoiningRoom(false);
+    }
   };
 
-  const createTestRoomMutation = useMutation({
-    mutationFn: async (difficulty: TestDifficulty) => {
-      setLoading(true);
-      setError(null);
+  const handleCreateTestRoom = async (difficulty: TestDifficulty) => {
+    setTestDifficulty(difficulty);
+    setIsCreatingTestRoom(true);
+    setMutationError(null);
+    setLoading(true);
+    setError(null);
+
+    try {
       const slug = generateSlug();
 
       // Create room
-      const room = await createRoom(slug);
+      const room = await createRoomMutation({ slug });
+      if (!room) throw new Error("Failed to create room");
 
       // Create 4 AI players with selected difficulty or random
       const getDifficulty = (): AIDifficulty => {
@@ -211,7 +213,7 @@ export function Home() {
         players: aiPlayers,
       };
 
-      await updateRoomGameState(slug, gameStateWithAI);
+      await updateGameStateMutation({ slug, gameState: gameStateWithAI });
 
       // Deal cards and start the game
       const hands = createAndDeal();
@@ -226,33 +228,24 @@ export function Home() {
         );
       }
 
-      await updateRoomGameState(slug, updatedGameState);
-      await updateRoomStatus(slug, "playing");
+      await updateGameStateMutation({ slug, gameState: updatedGameState });
+      await updateStatusMutation({ slug, status: "playing" });
 
-      return {
-        ...room,
-        gameState: updatedGameState,
-        status: "playing" as const,
-      };
-    },
-    onSuccess: (room) => {
       setCurrentRoom({
-        roomId: room.id,
+        roomId: room._id,
         slug: room.slug,
-        status: room.status,
+        status: "playing",
       });
       setLoading(false);
       navigate(`/room/${room.slug}?test=true`);
-    },
-    onError: (error: Error) => {
+    } catch (error) {
       setLoading(false);
-      setError(error.message);
-    },
-  });
-
-  const handleCreateTestRoom = (difficulty: TestDifficulty) => {
-    setTestDifficulty(difficulty);
-    createTestRoomMutation.mutate(difficulty);
+      const err = error instanceof Error ? error : new Error("Failed to create test room");
+      setError(err.message);
+      setMutationError(err);
+    } finally {
+      setIsCreatingTestRoom(false);
+    }
   };
 
   // Generate floating cards with stable values (memoized)
@@ -403,10 +396,10 @@ export function Home() {
           onCreateGame={handleCreateGame}
           onCreateTestRoom={handleCreateTestRoom}
           onJoinRoom={handleJoinRoom}
-          isCreatingRoom={createRoomMutation.isPending}
-          isCreatingTestRoom={createTestRoomMutation.isPending}
-          isJoiningRoom={joinRoomMutation.isPending}
-          error={createRoomMutation.error || joinRoomMutation.error}
+          isCreatingRoom={isCreatingRoom}
+          isCreatingTestRoom={isCreatingTestRoom}
+          isJoiningRoom={isJoiningRoom}
+          error={mutationError}
         />
 
         {/* User stats - subtle, only shows after playing */}

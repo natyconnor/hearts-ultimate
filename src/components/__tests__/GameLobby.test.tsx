@@ -8,7 +8,6 @@ import {
 } from "../../test/testUtils";
 import { GameLobby } from "../GameLobby";
 import { createPlayer } from "../../test/testUtils";
-import type { UseMutationResult } from "@tanstack/react-query";
 import type { AIDifficulty } from "../../types/game";
 
 // Mock react-router-dom
@@ -21,23 +20,25 @@ vi.mock("../GameSettings", () => ({
   GameSettings: () => <div>GameSettings</div>,
 }));
 
+// Mock mutation result type (compatible with our custom hooks)
+interface MockMutationResult<_T, E, V> {
+  mutate: (variables: V, options?: { onSuccess?: () => void }) => void;
+  isPending: boolean;
+  isError: boolean;
+  error: E | null;
+}
+
 describe("GameLobby Component", () => {
   const createMockMutation = <T, E, V>(
-    overrides: Partial<UseMutationResult<T, E, V>> = {}
-  ): UseMutationResult<T, E, V> => {
+    overrides: Partial<MockMutationResult<T, E, V>> = {}
+  ): MockMutationResult<T, E, V> => {
     return {
       mutate: vi.fn(),
-      mutateAsync: vi.fn(),
-      reset: vi.fn(),
-      status: "idle",
-      isIdle: true,
       isPending: false,
-      isSuccess: false,
       isError: false,
-      data: undefined,
       error: null,
       ...overrides,
-    } as UseMutationResult<T, E, V>;
+    } as MockMutationResult<T, E, V>;
   };
 
   const defaultProps = {
@@ -58,6 +59,7 @@ describe("GameLobby Component", () => {
       >(),
       startGame: createMockMutation<unknown, Error, void>(),
       leaveRoom: createMockMutation<unknown, Error, void>(),
+      returnToLobby: createMockMutation<unknown, Error, void>(),
     },
     spectatorMutations: {
       joinSpectator: createMockMutation<unknown, Error, string>(),

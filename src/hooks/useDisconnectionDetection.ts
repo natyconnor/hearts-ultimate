@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { updateRoomStatus, updateRoomGameState } from "../lib/roomApi";
+import { useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { CONNECTION_CONFIG } from "../lib/constants";
 import type { GameState, Player } from "../types/game";
 
@@ -39,6 +40,10 @@ export function useDisconnectionDetection({
   enabled,
   onGameEnded,
 }: UseDisconnectionDetectionParams): UseDisconnectionDetectionReturn {
+  // Convex mutations
+  const updateGameState = useMutation(api.rooms.updateGameState);
+  const updateStatus = useMutation(api.rooms.updateStatus);
+
   // Track when each player was first detected as disconnected
   const disconnectedAtRef = useRef<Map<string, number>>(new Map());
   const [disconnectedPlayers, setDisconnectedPlayers] = useState<
@@ -147,15 +152,29 @@ export function useDisconnectionDetection({
 
     if (expiredPlayer && slug && gameState && !isEndingGameRef.current) {
       isEndingGameRef.current = true;
-      endGameDueToDisconnection(
-        slug,
-        gameState,
-        expiredPlayer.player.name
-      ).then(() => {
-        onGameEnded?.();
-      });
+
+      // End the game due to disconnection
+      const endGame = async () => {
+        try {
+          const updatedGameState: GameState = {
+            ...gameState,
+            endReason: "player_disconnected",
+            endedByPlayerName: expiredPlayer.player.name,
+          };
+          await updateGameState({ slug, gameState: updatedGameState });
+          await updateStatus({ slug, status: "finished" });
+          console.log(
+            `Game ended: ${expiredPlayer.player.name} disconnected and grace period expired`
+          );
+          onGameEnded?.();
+        } catch (error) {
+          console.error("Failed to end game due to disconnection:", error);
+        }
+      };
+
+      endGame();
     }
-  }, [disconnectedPlayers, slug, gameState, onGameEnded]);
+  }, [disconnectedPlayers, slug, gameState, onGameEnded, updateGameState, updateStatus]);
 
   // Return empty array if not running
   const finalDisconnectedPlayers = shouldRun ? disconnectedPlayers : [];
@@ -165,26 +184,4 @@ export function useDisconnectionDetection({
     disconnectedPlayers: finalDisconnectedPlayers,
     isWaitingForReconnection,
   };
-}
-
-async function endGameDueToDisconnection(
-  slug: string,
-  gameState: GameState,
-  playerName: string
-): Promise<void> {
-  try {
-    // Update game state with end reason
-    const updatedGameState: GameState = {
-      ...gameState,
-      endReason: "player_disconnected",
-      endedByPlayerName: playerName,
-    };
-    await updateRoomGameState(slug, updatedGameState);
-    await updateRoomStatus(slug, "finished");
-    console.log(
-      `Game ended: ${playerName} disconnected and grace period expired`
-    );
-  } catch (error) {
-    console.error("Failed to end game due to disconnection:", error);
-  }
 }

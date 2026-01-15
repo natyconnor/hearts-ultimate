@@ -1,10 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useBlocker } from "react-router-dom";
-import {
-  updateRoomGameState,
-  updateRoomStatus,
-  deleteRoom,
-} from "../lib/roomApi";
+import { useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { useGameStore } from "../store/gameStore";
 import { STORAGE_KEYS } from "../lib/constants";
 import type { GameState } from "../types/game";
@@ -41,6 +38,11 @@ export function useRoomNavigationBlocker({
   const isPlayerInRoomRef = useRef(isPlayerInRoom);
   const roomStatusRef = useRef(roomStatus);
   const [isLeaving, setIsLeaving] = useState(false);
+
+  // Convex mutations
+  const updateGameState = useMutation(api.rooms.updateGameState);
+  const updateStatus = useMutation(api.rooms.updateStatus);
+  const deleteRoom = useMutation(api.rooms.deleteRoom);
 
   useEffect(() => {
     isPlayerInRoomRef.current = isPlayerInRoom;
@@ -98,17 +100,14 @@ export function useRoomNavigationBlocker({
       // If this was the last player, delete the room
       const isRoomEmpty = updatedPlayers.length === 0;
 
-      const promises: Promise<void>[] = [];
       if (isRoomEmpty) {
-        promises.push(deleteRoom(slug));
+        await deleteRoom({ slug });
       } else {
-        promises.push(updateRoomGameState(slug, updatedGameState));
+        await updateGameState({ slug, gameState: updatedGameState });
         if (currentRoomStatus === "playing") {
-          promises.push(updateRoomStatus(slug, "finished"));
+          await updateStatus({ slug, status: "finished" });
         }
       }
-
-      await Promise.all(promises);
 
       localStorage.removeItem(STORAGE_KEYS.PLAYER_ID);
       localStorage.removeItem(STORAGE_KEYS.PLAYER_NAME);
@@ -120,11 +119,23 @@ export function useRoomNavigationBlocker({
     } finally {
       setIsLeaving(false);
     }
-  }, [blocker, currentPlayerId, currentGameState, slug, clearCurrentRoom]);
+  }, [
+    blocker,
+    currentPlayerId,
+    currentGameState,
+    slug,
+    clearCurrentRoom,
+    updateGameState,
+    updateStatus,
+    deleteRoom,
+  ]);
 
   // Auto-reset blocker if we don't have the required data
   useEffect(() => {
-    if (blocker.state === "blocked" && (!currentPlayerId || !currentGameState || !slug)) {
+    if (
+      blocker.state === "blocked" &&
+      (!currentPlayerId || !currentGameState || !slug)
+    ) {
       blocker.reset();
     }
   }, [blocker, currentPlayerId, currentGameState, slug]);

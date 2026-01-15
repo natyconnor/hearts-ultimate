@@ -8,7 +8,14 @@ import { ConfirmModal } from "./ConfirmModal";
 import { cn } from "../lib/utils";
 import { getDifficultyDisplayName } from "../lib/aiPlayers";
 import type { Player, AIDifficulty, Spectator } from "../types/game";
-import type { UseMutationResult } from "@tanstack/react-query";
+
+// Mutation result type compatible with our custom hooks
+interface MutationResult<_TData, TError, TVariables> {
+  mutate: (variables: TVariables, options?: { onSuccess?: () => void }) => void;
+  isPending: boolean;
+  isError: boolean;
+  error: TError | null;
+}
 
 const DIFFICULTY_OPTIONS: {
   value: AIDifficulty;
@@ -37,20 +44,21 @@ const DIFFICULTY_OPTIONS: {
 ];
 
 interface LobbyMutations {
-  joinRoom: UseMutationResult<unknown, Error, string>;
-  addAIPlayers: UseMutationResult<unknown, Error, void>;
-  updateAIDifficulty: UseMutationResult<
+  joinRoom: MutationResult<unknown, Error, string>;
+  addAIPlayers: MutationResult<unknown, Error, void>;
+  updateAIDifficulty: MutationResult<
     unknown,
     Error,
     { playerId: string; difficulty: AIDifficulty }
   >;
-  startGame: UseMutationResult<unknown, Error, void>;
-  leaveRoom: UseMutationResult<unknown, Error, void>;
+  startGame: MutationResult<unknown, Error, void>;
+  leaveRoom: MutationResult<unknown, Error, void>;
+  returnToLobby: MutationResult<unknown, Error, void>;
 }
 
 interface SpectatorMutations {
-  joinSpectator: UseMutationResult<unknown, Error, string>;
-  leaveSpectator: UseMutationResult<unknown, Error, void>;
+  joinSpectator: MutationResult<unknown, Error, string>;
+  leaveSpectator: MutationResult<unknown, Error, void>;
 }
 
 interface GameLobbyProps {

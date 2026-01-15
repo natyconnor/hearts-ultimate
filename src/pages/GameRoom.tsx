@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery } from "convex/react";
 import { AnimatePresence } from "framer-motion";
-import { getRoomBySlug } from "../lib/roomApi";
-import { useGameRealtime } from "../hooks/useGameRealtime";
+import { api } from "../../convex/_generated/api";
 import { useRoomSync } from "../hooks/useRoomSync";
 import { useRoomNavigationBlocker } from "../hooks/useRoomNavigationBlocker";
 import { usePageUnloadWarning } from "../hooks/usePageUnloadWarning";
@@ -36,7 +35,7 @@ import { NameInputModal } from "../components/NameInputModal";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { DisconnectionOverlay } from "../components/DisconnectionOverlay";
 import { GameEndedOverlay } from "../components/GameEndedOverlay";
-import type { Card as CardType } from "../types/game";
+import type { Card as CardType, GameRoom as GameRoomType } from "../types/game";
 
 export function GameRoom() {
   const { slug } = useParams<{ slug: string }>();
@@ -73,20 +72,28 @@ export function GameRoom() {
   // Use ref for animation state to avoid closure issues in useEffect
   const isAnimatingRef = useRef(false);
 
-  const { isConnected, error: realtimeError } = useGameRealtime(slug ?? null);
+  // Use Convex query - automatically reactive, no need for separate realtime hook
+  const convexRoom = useQuery(api.rooms.getBySlug, slug ? { slug } : "skip");
 
-  const {
-    data: room,
-    isLoading,
-    error,
-  } = useQuery({
-    queryKey: ["room", slug],
-    queryFn: () => {
-      if (!slug) throw new Error("No slug provided");
-      return getRoomBySlug(slug);
-    },
-    enabled: !!slug,
-  });
+  // Convert Convex room to our GameRoom type - memoized to prevent unnecessary re-renders
+  const room: GameRoomType | null = useMemo(() => {
+    if (!convexRoom) return null;
+    return {
+      id: convexRoom._id,
+      slug: convexRoom.slug,
+      status: convexRoom.status,
+      gameState: convexRoom.gameState,
+      spectators: convexRoom.spectators,
+      createdAt: new Date(convexRoom._creationTime).toISOString(),
+    };
+  }, [convexRoom]);
+
+  const isLoading = convexRoom === undefined;
+  const error = null; // Convex throws on errors
+
+  // Convex queries are automatically reactive - isConnected is always true when using Convex
+  const isConnected = convexRoom !== undefined;
+  const realtimeError = null;
 
   useRoomSync(room, slug);
 
@@ -195,8 +202,7 @@ export function GameRoom() {
   // Get current player's name for presence tracking
   const currentPlayerName = currentPlayer?.name ?? null;
 
-  // Track player presence using Supabase Realtime Presence
-  // This automatically detects when players close their browser, lose connection, etc.
+  // Track player presence
   const { onlinePlayerIds } = usePlayerPresence({
     slug: slug ?? null,
     playerId: currentPlayerId,
@@ -207,7 +213,7 @@ export function GameRoom() {
   // Callback when game ends due to disconnection
   const handleGameEndedByDisconnection = useCallback(() => {
     // The game has ended because a player disconnected and didn't reconnect
-    // No need to navigate - the room status change will be picked up by realtime
+    // No need to navigate - the room status change will be picked up by Convex
   }, []);
 
   // Detect disconnected players and manage grace period
@@ -366,8 +372,8 @@ export function GameRoom() {
       return;
     }
 
-    const currentPlayer = currentGameState.players[currentPlayerIndex];
-    if (!currentPlayer.isAI) return;
+    const currentPlayerInGame = currentGameState.players[currentPlayerIndex];
+    if (!currentPlayerInGame.isAI) return;
 
     // In test mode, skip delays for fast playthrough
     // Otherwise, use the user's configured AI play speed
@@ -379,7 +385,8 @@ export function GameRoom() {
       if (
         !latestState ||
         latestState.currentPlayerIndex !== currentPlayerIndex ||
-        latestState.players[currentPlayerIndex]?.id !== currentPlayer.id ||
+        latestState.players[currentPlayerIndex]?.id !==
+          currentPlayerInGame.id ||
         gameplayMutations.playCard.isPending
       ) {
         return;
@@ -388,7 +395,7 @@ export function GameRoom() {
       const chosenCard = chooseAICard(latestState, currentPlayerIndex);
       gameplayMutations.playCard.mutate({
         card: chosenCard,
-        playerId: currentPlayer.id,
+        playerId: currentPlayerInGame.id,
       });
     }, delay);
 
@@ -410,15 +417,15 @@ export function GameRoom() {
   const handleCardClick = (card: CardType) => {
     if (!currentPlayerId) return;
 
-    const currentGameState = gameState ?? room?.gameState;
-    if (!currentGameState) return;
+    const latestGameState = gameState ?? room?.gameState;
+    if (!latestGameState) return;
 
-    const playerIndex = currentGameState.players.findIndex(
+    const playerIndex = latestGameState.players.findIndex(
       (p) => p.id === currentPlayerId
     );
 
     // Check if it's the player's turn
-    if (currentGameState.currentPlayerIndex !== playerIndex) {
+    if (latestGameState.currentPlayerIndex !== playerIndex) {
       return;
     }
 
@@ -428,16 +435,16 @@ export function GameRoom() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-xl">Loading room...</div>
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-gray-800 to-gray-900">
+        <div className="text-xl text-white">Loading room...</div>
       </div>
     );
   }
 
   if (error || !room) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-xl text-red-600">
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-gray-800 to-gray-900">
+        <div className="text-xl text-red-400">
           Error: {error ? String(error) : "Room not found"}
         </div>
       </div>

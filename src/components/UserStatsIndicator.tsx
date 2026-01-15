@@ -13,13 +13,13 @@ export function UserStatsIndicator() {
   const [showAccountModal, setShowAccountModal] = useState(false);
 
   // Don't show anything while loading or if no games played
-  if (isLoading || !stats || stats.games_played === 0) {
+  if (isLoading || !stats || stats.gamesPlayed === 0) {
     return null;
   }
 
   const winRate =
-    stats.games_played > 0
-      ? Math.round((stats.games_won / stats.games_played) * 100)
+    stats.gamesPlayed > 0
+      ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100)
       : 0;
 
   return (
@@ -31,15 +31,15 @@ export function UserStatsIndicator() {
         className="absolute bottom-16 left-1/2 -translate-x-1/2 text-center"
       >
         <div className="text-xs text-white/40 space-x-3">
-          <span>{stats.games_played} games</span>
+          <span>{stats.gamesPlayed} games</span>
           <span>•</span>
           <span>
-            {stats.games_won} wins ({winRate}%)
+            {stats.gamesWon} wins ({winRate}%)
           </span>
-          {stats.moons_shot > 0 && (
+          {stats.moonsShot > 0 && (
             <>
               <span>•</span>
-              <span>🌙 {stats.moons_shot}</span>
+              <span>🌙 {stats.moonsShot}</span>
             </>
           )}
           {isAnonymous && (

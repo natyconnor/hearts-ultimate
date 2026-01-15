@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
-import { updateRoomGameState } from "../lib/roomApi";
+import { useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { STORAGE_KEYS } from "../lib/constants";
 import type { GameState } from "../types/game";
 
@@ -28,6 +29,7 @@ export function usePlayerReconnection({
   updateGameState,
 }: UsePlayerReconnectionParams) {
   const hasAttemptedReconnectionRef = useRef(false);
+  const updateRoomGameState = useMutation(api.rooms.updateGameState);
 
   useEffect(() => {
     // Only attempt reconnection once per mount
@@ -98,7 +100,7 @@ export function usePlayerReconnection({
 
       // Update both local state and server
       updateGameState(updatedGameState);
-      updateRoomGameState(slug, updatedGameState).catch((err) => {
+      updateRoomGameState({ slug, gameState: updatedGameState }).catch((err) => {
         console.error("Failed to update reconnection status:", err);
       });
 
@@ -111,5 +113,6 @@ export function usePlayerReconnection({
     currentPlayerId,
     setCurrentPlayerId,
     updateGameState,
+    updateRoomGameState,
   ]);
 }

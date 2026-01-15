@@ -1,28 +1,29 @@
 import { createContext } from "react";
-import type { User } from "@supabase/supabase-js";
 
 export interface UserStats {
-  games_played: number;
-  games_won: number;
-  total_points_taken: number;
-  moons_shot: number;
+  gamesPlayed: number;
+  gamesWon: number;
+  totalPointsTaken: number;
+  moonsShot: number;
 }
 
 export interface AuthContextType {
-  /** The current Supabase user (anonymous or linked) */
-  user: User | null;
-  /** True while checking/creating session on initial load */
+  /** True if user is authenticated via Convex Auth */
+  isAuthenticated: boolean;
+  /** True while checking session on initial load */
   isLoading: boolean;
-  /** True if user hasn't linked to email/OAuth yet */
+  /** True if user hasn't signed in yet (playing anonymously) */
   isAnonymous: boolean;
   /** User's game statistics */
   stats: UserStats | null;
   /** Refresh stats from database */
-  refreshStats: () => Promise<void>;
-  /** Link anonymous account to email/password */
-  linkWithEmail: (email: string, password: string) => Promise<void>;
-  /** Link anonymous account to OAuth provider (Google, GitHub, etc.) */
-  linkWithOAuth: (provider: "google" | "github") => Promise<void>;
+  refreshStats: () => void;
+  /** Sign in with email/password */
+  signIn: (email: string, password: string) => Promise<void>;
+  /** Sign up with email/password */
+  signUp: (email: string, password: string) => Promise<void>;
+  /** Sign out */
+  signOut: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | null>(null);

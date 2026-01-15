@@ -1,14 +1,16 @@
 import { useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { useGameStore } from "../store/gameStore";
 import type { GameRoom } from "../types/game";
 
+/**
+ * Syncs room data from Convex query to game store.
+ * Convex queries are automatically reactive, so we just need to update the store.
+ */
 export function useRoomSync(
   room: GameRoom | null | undefined,
-  slug: string | undefined
+  _slug: string | undefined
 ) {
-  const { setCurrentRoom, updateGameState, updateSpectators, currentRoom } = useGameStore();
-  const queryClient = useQueryClient();
+  const { setCurrentRoom, updateGameState, updateSpectators } = useGameStore();
 
   useEffect(() => {
     if (!room) return;
@@ -21,10 +23,4 @@ export function useRoomSync(
     updateGameState(room.gameState);
     updateSpectators(room.spectators);
   }, [room, setCurrentRoom, updateGameState, updateSpectators]);
-
-  useEffect(() => {
-    if (currentRoom.status && room && currentRoom.status !== room.status) {
-      queryClient.invalidateQueries({ queryKey: ["room", slug] });
-    }
-  }, [currentRoom.status, room, queryClient, slug]);
 }

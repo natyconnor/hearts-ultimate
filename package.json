@@ -5,16 +5,19 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev:convex": "npx convex dev",
+    "dev:all": "npx convex dev & vite",
+    "build": "npx convex deploy --cmd 'tsc -b && vite build'",
+    "build:vite": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.89.0",
-    "@tanstack/react-query": "^5.90.16",
+    "@convex-dev/auth": "^0.0.90",
     "clsx": "^2.1.1",
+    "convex": "^1.31.4",
     "framer-motion": "^12.23.26",
     "lucide-react": "^0.562.0",
     "react": "^19.2.0",
