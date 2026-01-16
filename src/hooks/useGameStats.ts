@@ -1,6 +1,7 @@
 import { useCallback } from "react";
-import { useMutation } from "convex/react";
+import { useMutation, useConvexAuth } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { recordLocalGameResult } from "../lib/localStats";
 
 interface GameResult {
   won: boolean;
@@ -10,28 +11,34 @@ interface GameResult {
 
 /**
  * Hook for recording game statistics.
+ * - Authenticated users: saves to Convex database
+ * - Anonymous users: saves to localStorage
  * Stats are recorded silently in the background - errors don't affect gameplay.
- * Only works for authenticated users (via Convex Auth).
  */
 export function useGameStats() {
+  const { isAuthenticated } = useConvexAuth();
   const recordGameResultMutation = useMutation(api.stats.recordGameResult);
 
   const recordGameResult = useCallback(
     async (result: GameResult) => {
       try {
-        // Call the Convex mutation to record stats
-        // This will silently do nothing if user isn't authenticated
-        await recordGameResultMutation({
-          won: result.won,
-          pointsTaken: result.pointsTaken,
-          shotTheMoon: result.shotTheMoon,
-        });
+        if (isAuthenticated) {
+          // Authenticated user: save to Convex
+          await recordGameResultMutation({
+            won: result.won,
+            pointsTaken: result.pointsTaken,
+            shotTheMoon: result.shotTheMoon,
+          });
+        } else {
+          // Anonymous user: save to localStorage
+          recordLocalGameResult(result);
+        }
       } catch (err) {
         // Silently fail - stats are nice-to-have, not critical
         console.warn("Failed to record game stats:", err);
       }
     },
-    [recordGameResultMutation]
+    [isAuthenticated, recordGameResultMutation]
   );
 
   return { recordGameResult };

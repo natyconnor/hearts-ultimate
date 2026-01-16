@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useGameStats } from "./useGameStats";
+import { useAuth } from "./useAuth";
 import type { GameState } from "../types/game";
 
 interface UseRecordGameResultProps {
@@ -13,6 +14,8 @@ interface UseRecordGameResultProps {
  * - Only records for human players (not AI, not spectators)
  * - Only records once per game (tracks last recorded game)
  * - Records silently in background (doesn't affect UX)
+ * - Anonymous users: stats saved to localStorage
+ * - Authenticated users: stats saved to Convex
  */
 export function useRecordGameResult({
   gameState,
@@ -20,6 +23,7 @@ export function useRecordGameResult({
   showGameEnd,
 }: UseRecordGameResultProps) {
   const { recordGameResult } = useGameStats();
+  const { refreshStats } = useAuth();
 
   // Track which game we've recorded to avoid duplicates
   // Using a combination of round number + scores as a simple game identifier
@@ -71,5 +75,8 @@ export function useRecordGameResult({
       pointsTaken,
       shotTheMoon,
     });
-  }, [showGameEnd, gameState, currentPlayerId, recordGameResult]);
+
+    // Trigger a refresh so the UI updates with new local stats
+    refreshStats();
+  }, [showGameEnd, gameState, currentPlayerId, recordGameResult, refreshStats]);
 }

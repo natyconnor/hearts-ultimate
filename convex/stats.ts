@@ -54,3 +54,44 @@ export const recordGameResult = mutation({
     }
   },
 });
+
+/**
+ * Migrate local stats from localStorage when user signs up/in
+ * Adds local stats to any existing stats the user may have
+ */
+export const migrateLocalStats = mutation({
+  args: {
+    gamesPlayed: v.number(),
+    gamesWon: v.number(),
+    totalPointsTaken: v.number(),
+    moonsShot: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return; // Not authenticated
+
+    const existing = await ctx.db
+      .query("userStats")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+
+    if (existing) {
+      // Add local stats to existing stats
+      await ctx.db.patch(existing._id, {
+        gamesPlayed: existing.gamesPlayed + args.gamesPlayed,
+        gamesWon: existing.gamesWon + args.gamesWon,
+        totalPointsTaken: existing.totalPointsTaken + args.totalPointsTaken,
+        moonsShot: existing.moonsShot + args.moonsShot,
+      });
+    } else {
+      // Create new stats record with local stats
+      await ctx.db.insert("userStats", {
+        userId,
+        gamesPlayed: args.gamesPlayed,
+        gamesWon: args.gamesWon,
+        totalPointsTaken: args.totalPointsTaken,
+        moonsShot: args.moonsShot,
+      });
+    }
+  },
+});
