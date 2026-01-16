@@ -9,6 +9,7 @@ interface CardProps {
   className?: string;
   onClick?: () => void;
   isMini?: boolean; // Mini card variant - simpler design for summaries
+  showQueenGlow?: boolean; // Show ominous glow for Queen of Spades
 }
 
 const SUIT_SYMBOLS: Record<CardSuit, string> = {
@@ -48,10 +49,15 @@ export function Card({
   className,
   onClick,
   isMini = false,
+  showQueenGlow = false,
 }: CardProps) {
   const rankStr = rankToString(rank);
   const suitSymbol = SUIT_SYMBOLS[suit];
   const suitColor = SUIT_COLORS[suit];
+
+  // Queen of Spades detection
+  const isQueenOfSpades = suit === "spades" && rank === 12;
+  const shouldShowQueenGlow = isQueenOfSpades && showQueenGlow;
 
   return (
     <div
@@ -63,6 +69,8 @@ export function Card({
         onClick && "cursor-pointer hover:shadow-2xl active:scale-95",
         isSelected &&
           "ring-4 ring-yellow-400 ring-offset-2 ring-offset-poker-green scale-110 -translate-y-4 z-[200] shadow-2xl",
+        shouldShowQueenGlow &&
+          "shadow-2xl shadow-red-500/50 ring-3 ring-red-400",
         className
       )}
       onClick={onClick}

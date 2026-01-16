@@ -437,7 +437,7 @@ export function GameRoom() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-gray-800 to-gray-900">
+      <div className="flex items-center justify-center min-h-screen bg-linear-to-b from-gray-800 to-gray-900">
         <div className="text-xl text-white">Loading room...</div>
       </div>
     );
@@ -445,7 +445,7 @@ export function GameRoom() {
 
   if (error || !room) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-gray-800 to-gray-900">
+      <div className="flex items-center justify-center min-h-screen bg-linear-to-b from-gray-800 to-gray-900">
         <div className="text-xl text-red-400">
           Error: {error ? String(error) : "Room not found"}
         </div>
@@ -461,7 +461,7 @@ export function GameRoom() {
     (roomStatus === "finished" && (showGameEnd || showGameEndedUnexpectedly))
   ) {
     return (
-      <div className="flex flex-col h-screen w-full overflow-hidden bg-gradient-to-b from-gray-800 to-gray-900">
+      <div className="flex flex-col h-screen w-full overflow-hidden bg-linear-to-b from-gray-800 to-gray-900">
         <GameHeader
           slug={slug ?? ""}
           isConnected={isConnected}

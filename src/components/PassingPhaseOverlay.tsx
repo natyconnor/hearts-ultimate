@@ -275,7 +275,7 @@ export function PassingPhaseOverlay({
               className={cn(
                 "px-8 py-3 rounded-xl font-semibold text-lg transition-all shadow-lg",
                 selectedCards.length === 3
-                  ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:shadow-xl hover:shadow-green-500/30 cursor-pointer"
+                  ? "bg-linear-to-r from-green-500 to-emerald-600 text-white hover:shadow-xl hover:shadow-green-500/30 cursor-pointer"
                   : "bg-gray-600 text-gray-400 cursor-not-allowed"
               )}
             >

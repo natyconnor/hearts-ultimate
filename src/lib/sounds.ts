@@ -7,6 +7,7 @@ type SoundType =
   | 'trickWin'
   | 'heartsBroken'
   | 'shootTheMoon'
+  | 'queenOfSpades'
   | 'gameEnd'
   | 'buttonClick'
   | 'error';
@@ -15,6 +16,8 @@ class SoundManager {
   private audioContext: AudioContext | null = null;
   private enabled: boolean = true;
   private volume: number = 0.3;
+  private audioBuffers: Map<string, AudioBuffer> = new Map();
+  private loadingPromises: Map<string, Promise<AudioBuffer | null>> = new Map();
 
   private getAudioContext(): AudioContext | null {
     if (typeof window === 'undefined') return null;
@@ -52,6 +55,61 @@ class SoundManager {
     return this.volume;
   }
 
+  // Load an audio file and cache it
+  private async loadAudioFile(url: string): Promise<AudioBuffer | null> {
+    // Return cached buffer if available
+    if (this.audioBuffers.has(url)) {
+      return this.audioBuffers.get(url)!;
+    }
+
+    // Return existing loading promise if already loading
+    if (this.loadingPromises.has(url)) {
+      return this.loadingPromises.get(url)!;
+    }
+
+    const ctx = this.getAudioContext();
+    if (!ctx) return null;
+
+    const loadPromise = (async () => {
+      try {
+        const response = await fetch(url);
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+        this.audioBuffers.set(url, audioBuffer);
+        return audioBuffer;
+      } catch (error) {
+        console.warn(`Failed to load audio file: ${url}`, error);
+        return null;
+      } finally {
+        this.loadingPromises.delete(url);
+      }
+    })();
+
+    this.loadingPromises.set(url, loadPromise);
+    return loadPromise;
+  }
+
+  // Play a loaded audio buffer
+  private playAudioBuffer(buffer: AudioBuffer): void {
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+
+    const gainNode = ctx.createGain();
+    gainNode.gain.value = this.volume;
+
+    source.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    source.start(0);
+  }
+
+  // Preload audio files for instant playback
+  preloadAudio(urls: string[]): void {
+    urls.forEach(url => this.loadAudioFile(url));
+  }
+
   play(type: SoundType): void {
     if (!this.enabled) return;
 
@@ -74,6 +132,9 @@ class SoundManager {
           break;
         case 'shootTheMoon':
           this.playShootTheMoonSound(ctx);
+          break;
+        case 'queenOfSpades':
+          this.playQueenOfSpadesSound(ctx);
           break;
         case 'gameEnd':
           this.playGameEndSound(ctx);
@@ -221,6 +282,48 @@ class SoundManager {
     });
   }
 
+  // Ominous sound for Queen of Spades - uses audio file
+  private playQueenOfSpadesSound(_ctx: AudioContext): void {
+    // Try to play audio file, fall back to synthesized if not available
+    this.loadAudioFile('/sounds/queen-of-spades.mp3').then(buffer => {
+      if (buffer) {
+        this.playAudioBuffer(buffer);
+      } else {
+        // Fallback: simple low thud
+        this.playQueenOfSpadesFallback();
+      }
+    });
+  }
+
+  // Fallback synthesized sound if audio file isn't available
+  private playQueenOfSpadesFallback(): void {
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+
+    // Play 3 deep drum hits
+    [0, 0.18, 0.36].forEach((delay) => {
+      const hitTime = now + delay;
+
+      // Deep bass drum
+      const kick = ctx.createOscillator();
+      kick.type = 'sine';
+      kick.frequency.setValueAtTime(60, hitTime);
+      kick.frequency.exponentialRampToValueAtTime(25, hitTime + 0.2);
+
+      const kickGain = ctx.createGain();
+      kickGain.gain.setValueAtTime(this.volume * 0.6, hitTime);
+      kickGain.gain.exponentialRampToValueAtTime(0.001, hitTime + 0.3);
+
+      kick.connect(kickGain);
+      kickGain.connect(ctx.destination);
+
+      kick.start(hitTime);
+      kick.stop(hitTime + 0.35);
+    });
+  }
+
   // Game over celebration/finale sound
   private playGameEndSound(ctx: AudioContext): void {
     const now = ctx.currentTime;
@@ -306,6 +409,9 @@ if (typeof window !== 'undefined') {
       soundManager.setVolume(volume);
     }
   }
+
+  // Preload audio files
+  soundManager.preloadAudio(['/sounds/queen-of-spades.mp3']);
 }
 
 // Convenience function

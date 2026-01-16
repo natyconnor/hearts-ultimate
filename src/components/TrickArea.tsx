@@ -139,7 +139,14 @@ export function TrickArea({
                       }
                 }
               >
-                <Card suit={trickCard.card.suit} rank={trickCard.card.rank} />
+                <Card
+                  suit={trickCard.card.suit}
+                  rank={trickCard.card.rank}
+                  showQueenGlow={
+                    trickCard.card.suit === "spades" &&
+                    trickCard.card.rank === 12
+                  }
+                />
               </motion.div>
             );
           })}
