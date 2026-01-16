@@ -194,13 +194,25 @@ function scoreWinningPlay(
     reasons.push("Safe win as last player");
     addScore(card.rank * FOLLOW_SCORES.TRICK_1_RANK_MULTIPLIER);
   } else {
-    scoreRiskyWin(card, context, memory, forcedToWin, reasons, addScore, riskMultiplier);
+    scoreRiskyWin(
+      card,
+      context,
+      memory,
+      forcedToWin,
+      reasons,
+      addScore,
+      riskMultiplier
+    );
   }
 
   // Bluffing - use aggressiveness-adjusted probability if provided
   const effectiveBluffProb = bluffProbability ?? config.bluffProbability;
   const configForBluff = { ...config, bluffProbability: effectiveBluffProb };
-  if (shouldBluff(context, configForBluff) && penaltyPoints === 0 && lastToPlay) {
+  if (
+    shouldBluff(context, configForBluff) &&
+    penaltyPoints === 0 &&
+    lastToPlay
+  ) {
     addScore(FOLLOW_SCORES.BLUFF_TAKE_SAFE);
     reasons.push("Bluff - take safe trick");
   }
@@ -284,13 +296,29 @@ function scoreRiskyWin(
   const memoryStats = memory.getStats();
   const memoryReliable = memoryStats.tricksCounted >= 2;
 
+  // Check if there are still players after us who could potentially overtake
+  const playersAfterUsCount = playersAfterUs.length;
+  const allPlayersAfterVoid =
+    playersAfterUsCount > 0 && voidPlayersAhead === playersAfterUsCount;
+
   if (memoryReliable) {
     // No known voids and memory is reliable - probably safe
     addScore(FOLLOW_SCORES.SAFE_WIN * 0.5);
     reasons.push("Likely safe (memory)");
-    if (forcedToWin || card.rank > RANK.MID_RANGE_MAX) {
-      addScore(card.rank);
-      reasons.push("Dump high card");
+
+    // Only dump high if we're truly committed to taking this trick
+    // If there are players after us who could still overtake, prefer lower cards
+    if (playersAfterUsCount === 0 || allPlayersAfterVoid) {
+      // No one left to play OR all remaining players are void - we're taking this
+      if (forcedToWin || card.rank > RANK.MID_RANGE_MAX) {
+        addScore(card.rank);
+        reasons.push("Dump high card (last/all next players void)");
+      }
+    } else {
+      // Players remain who could overtake - play lower winning cards
+      // Give them a chance to take the trick with a higher card
+      addScore(-card.rank);
+      reasons.push("Play low winner (player(s) can still overtake)");
     }
   } else {
     // Early game, no info yet - slight risk (apply risk multiplier)
