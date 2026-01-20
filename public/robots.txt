@@ -1,0 +1,8 @@
+# robots.txt for Hearts Ultimate
+
+User-agent: *
+Allow: /
+Disallow: /room/
+
+# Sitemap location
+Sitemap: https://hearts-ultimate.vercel.app/sitemap.xml

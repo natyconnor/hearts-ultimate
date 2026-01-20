@@ -137,7 +137,8 @@ export function Home() {
       }
     } catch (error) {
       setLoading(false);
-      const err = error instanceof Error ? error : new Error("Failed to create room");
+      const err =
+        error instanceof Error ? error : new Error("Failed to create room");
       setError(err.message);
       setMutationError(err);
     } finally {
@@ -157,7 +158,8 @@ export function Home() {
       navigate(`/room/${slug}`);
     } catch (error) {
       setLoading(false);
-      const err = error instanceof Error ? error : new Error("Failed to join room");
+      const err =
+        error instanceof Error ? error : new Error("Failed to join room");
       setError(err.message);
       setMutationError(err);
     } finally {
@@ -240,7 +242,10 @@ export function Home() {
       navigate(`/room/${room.slug}?test=true`);
     } catch (error) {
       setLoading(false);
-      const err = error instanceof Error ? error : new Error("Failed to create test room");
+      const err =
+        error instanceof Error
+          ? error
+          : new Error("Failed to create test room");
       setError(err.message);
       setMutationError(err);
     } finally {
@@ -322,7 +327,7 @@ export function Home() {
   return (
     <div className="h-screen w-screen fixed inset-0 overflow-hidden">
       {/* Animated gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-900" />
+      <div className="absolute inset-0 bg-linear-to-br from-slate-900 via-emerald-950 to-slate-900" />
 
       {/* Subtle pattern overlay */}
       <div className="absolute inset-0 opacity-30">
@@ -382,7 +387,7 @@ export function Home() {
           </motion.div>
 
           <h1 className="text-5xl md:text-6xl font-black text-white tracking-tight mb-3">
-            <span className="bg-gradient-to-r from-white via-red-200 to-white bg-clip-text text-transparent">
+            <span className="bg-linear-to-r from-white via-red-200 to-white bg-clip-text text-transparent">
               Hearts
             </span>
           </h1>
