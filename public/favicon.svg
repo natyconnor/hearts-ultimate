@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <!-- Gradient for the heart -->
+    <linearGradient id="heartGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff4d6d"/>
+      <stop offset="50%" style="stop-color:#e63946"/>
+      <stop offset="100%" style="stop-color:#c1121f"/>
+    </linearGradient>
+    <!-- Subtle inner shadow/highlight -->
+    <radialGradient id="heartHighlight" cx="30%" cy="30%" r="50%">
+      <stop offset="0%" style="stop-color:#ff8fa3;stop-opacity:0.6"/>
+      <stop offset="100%" style="stop-color:#e63946;stop-opacity:0"/>
+    </radialGradient>
+    <!-- Sparkle gradient -->
+    <radialGradient id="sparkleGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#ffffff"/>
+      <stop offset="50%" style="stop-color:#fffacd"/>
+      <stop offset="100%" style="stop-color:#ffffff;stop-opacity:0"/>
+    </radialGradient>
+  </defs>
+  
+  <!-- Heart shape - enlarged to fill space -->
+  <path 
+    d="M32 62 C32 62 2 42 2 20 C2 8 12 1 22 1 C28 1 32 6 32 6 C32 6 36 1 42 1 C52 1 62 8 62 20 C62 42 32 62 32 62 Z"
+    fill="url(#heartGradient)"
+  />
+  
+  <!-- Heart highlight overlay -->
+  <path 
+    d="M32 62 C32 62 2 42 2 20 C2 8 12 1 22 1 C28 1 32 6 32 6 C32 6 36 1 42 1 C52 1 62 8 62 20 C62 42 32 62 32 62 Z"
+    fill="url(#heartHighlight)"
+  />
+  
+  <!-- Large sparkle (top right) -->
+  <g transform="translate(52, 12)">
+    <!-- Sparkle glow -->
+    <circle cx="0" cy="0" r="10" fill="url(#sparkleGlow)" opacity="0.6"/>
+    <!-- 4-point star sparkle -->
+    <path 
+      d="M0 -11 L1.5 -1.5 L11 0 L1.5 1.5 L0 11 L-1.5 1.5 L-11 0 L-1.5 -1.5 Z"
+      fill="#ffffff"
+    />
+    <!-- Inner bright center -->
+    <circle cx="0" cy="0" r="2.5" fill="#ffffff"/>
+  </g>
+  
+  <!-- Small sparkle (bottom left) -->
+  <g transform="translate(10, 44)">
+    <!-- Sparkle glow -->
+    <circle cx="0" cy="0" r="7" fill="url(#sparkleGlow)" opacity="0.5"/>
+    <!-- 4-point star sparkle -->
+    <path 
+      d="M0 -8 L1.2 -1.2 L8 0 L1.2 1.2 L0 8 L-1.2 1.2 L-8 0 L-1.2 -1.2 Z"
+      fill="#ffffff"
+    />
+    <!-- Inner bright center -->
+    <circle cx="0" cy="0" r="1.8" fill="#ffffff"/>
+  </g>
+</svg>
