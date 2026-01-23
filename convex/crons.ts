@@ -11,10 +11,13 @@ crons.interval(
 );
 
 // Clean stale presence records every 30 seconds
-crons.interval(
-  "cleanup stale presence",
-  { seconds: 30 },
-  internal.cleanup.stalePresence
-);
+// Only enable in production to save on function call usage in dev
+if (process.env.ENABLE_PRESENCE_CRON === "true") {
+  crons.interval(
+    "cleanup stale presence",
+    { seconds: 30 },
+    internal.cleanup.stalePresence
+  );
+}
 
 export default crons;

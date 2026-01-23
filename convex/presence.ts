@@ -82,10 +82,18 @@ export const getOnlinePlayers = query({
 /**
  * Internal mutation to clean up stale presence records
  * Called by cron job
+ * Early-exits if ENABLE_PRESENCE_CRON is not set to "true" (for dev environments)
  */
 export const cleanupStale = internalMutation({
   args: {},
   handler: async (ctx) => {
+    // Early exit if not enabled (for dev environments)
+    // This prevents function execution but the cron still fires
+    // To fully disable, set ENABLE_PRESENCE_CRON=false or don't set it
+    if (process.env.ENABLE_PRESENCE_CRON !== "true") {
+      return { deleted: 0, skipped: true };
+    }
+
     const now = Date.now();
     const cutoff = now - PRESENCE_TIMEOUT_MS;
 
