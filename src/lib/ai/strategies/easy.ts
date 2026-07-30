@@ -92,7 +92,7 @@ export class EasyStrategy implements AIStrategy {
       tricksPlayedThisRound,
     } = context;
     let decision: Card;
-    let contextInfo = "";
+    let contextInfo: string;
 
     // If following suit, play the lowest card of that suit
     if (!isLeading && leadSuit) {

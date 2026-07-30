@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, Copy, Check, Eye, Home } from "lucide-react";
 import { GameSettings } from "./GameSettings";

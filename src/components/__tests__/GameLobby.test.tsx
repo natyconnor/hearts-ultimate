@@ -10,8 +10,8 @@ import { GameLobby } from "../GameLobby";
 import { createPlayer } from "../../test/testUtils";
 import type { AIDifficulty } from "../../types/game";
 
-// Mock react-router-dom
-vi.mock("react-router-dom", () => ({
+// Mock react-router
+vi.mock("react-router", () => ({
   useNavigate: () => vi.fn(),
 }));
 

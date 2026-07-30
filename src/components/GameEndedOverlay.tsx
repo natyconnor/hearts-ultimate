@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { Home, RefreshCw, UserX, Wifi, Users } from "lucide-react";
 import { cn } from "../lib/utils";
 import { STORAGE_KEYS } from "../lib/constants";

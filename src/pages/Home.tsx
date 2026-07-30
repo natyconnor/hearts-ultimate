@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useMutation } from "convex/react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { useGameStore } from "../store/gameStore";
 import { generateSlug } from "../lib/slugGenerator";
 import type { AIDifficulty, GameState } from "../types/game";

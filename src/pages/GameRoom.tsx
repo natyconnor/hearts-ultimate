@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router";
 import { useQuery } from "convex/react";
 import { AnimatePresence } from "framer-motion";
 import { api } from "../../convex/_generated/api";
