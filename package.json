@@ -7,7 +7,7 @@
     "dev": "vite",
     "dev:convex": "npx convex dev",
     "dev:all": "npx convex dev & vite",
-    "build": "npx convex deploy --cmd 'tsc -b && vite build'",
+    "build": "npx convex deploy --cmd 'tsc -b && vite build' --check-build-environment disable",
     "build:vite": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
