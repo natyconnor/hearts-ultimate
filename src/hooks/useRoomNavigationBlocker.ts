@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useBlocker } from "react-router-dom";
+import { useBlocker } from "react-router";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useGameStore } from "../store/gameStore";
@@ -60,7 +60,7 @@ export function useRoomNavigationBlocker({
   const isBlocked = blocker.state === "blocked";
 
   const blockMessage =
-    roomStatusRef.current === "playing"
+    roomStatus === "playing"
       ? "You are leaving an active game. This will end the game for everyone. Are you sure?"
       : "You are leaving the room. Do you want to leave?";
 

@@ -191,7 +191,7 @@ function generateBorderlineMoonHand(): Card[] {
 
   // Randomly decide critical card configuration
   const config = Math.random();
-  let configDesc = "";
+  let configDesc: string;
 
   if (config < 0.25) {
     // Config 1: Has A♥ and Q♠ (strong base, but fewer other high cards)

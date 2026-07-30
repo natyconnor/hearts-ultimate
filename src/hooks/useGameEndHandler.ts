@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { useGameStore } from "../store/gameStore";
 import { STORAGE_KEYS } from "../lib/constants";
 import type { GameRoom } from "../types/game";

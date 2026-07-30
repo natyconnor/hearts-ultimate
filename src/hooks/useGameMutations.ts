@@ -1,5 +1,5 @@
 import { useMutation as useConvexMutation } from "convex/react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { api } from "../../convex/_generated/api";
 import { createAIPlayersToFillSlots } from "../lib/aiPlayers";
 import { createAndDeal } from "../game/deck";

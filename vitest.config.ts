@@ -12,11 +12,7 @@ export default defineConfig({
     environment: "happy-dom",
     globals: true,
     pool: "forks",
-    poolOptions: {
-      forks: {
-        singleFork: true,
-      },
-    },
+    maxWorkers: 1,
     // Setup file for testing-library matchers
     setupFiles: ["./src/test/setup.ts"],
     // Explicitly exclude .pnpm-store and other directories
